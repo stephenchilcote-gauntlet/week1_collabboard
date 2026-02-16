@@ -23,7 +23,7 @@ All lanes are mutually parallel.
 3. `1-B-3` **[PBT]** (done)
 
 ### Lane 3: `src/utils/ids.js`
-1. `4-B-1` **[PBT]**
+1. `4-B-1` **[PBT]** (done)
 
 ### Lane 4: `src/utils/throttle.js`
 1. `4-C-1` **[PBT]**
