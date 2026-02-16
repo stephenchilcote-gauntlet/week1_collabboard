@@ -93,9 +93,9 @@ All lanes are mutually parallel.
 3. `5-A-3` → depends on `5-A-2` (done)
 
 ### Lane 3: `src/hooks/useCursors.js`
-1. `6-A-1` → depends on `8-A-5`, `1-B-*`, `4-C-*`
-2. `6-A-2` → depends on `6-A-1`
-3. `6-A-3` → depends on `6-A-2`
+1. `6-A-1` → depends on `8-A-5`, `1-B-*`, `4-C-*` (done)
+2. `6-A-2` → depends on `6-A-1` (done)
+3. `6-A-3` → depends on `6-A-2` (done)
 
 ### Lane 4: `src/hooks/usePresence.js`
 1. `7-A-1` → depends on `8-A-5`

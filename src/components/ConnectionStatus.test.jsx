@@ -31,13 +31,14 @@ describe('ConnectionStatus', () => {
     expect(getByText('Connection lost — reconnecting…')).toBeInTheDocument();
   });
 
-  it('hides banner when connected', () => {
+  it('hides banner when connected', async () => {
     mockOnValue.mockImplementation((_ref, callback) => {
       callback({ val: () => true });
       return vi.fn();
     });
 
     const { queryByText } = render(<ConnectionStatus />);
+    await Promise.resolve();
     expect(queryByText('Connection lost — reconnecting…')).toBeNull();
   });
 });
