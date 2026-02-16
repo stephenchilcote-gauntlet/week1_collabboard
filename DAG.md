@@ -30,11 +30,11 @@ All lanes are mutually parallel.
 2. `4-C-2` **[PBT]** → depends on `4-C-1` (done)
 
 ### Lane 5: `src/utils/colors.js`
-1. `C-C-2` **[PBT]**
-2. `C-C-1` **[PBT]** → depends on `C-C-2`
-3. `C-C-3`
-4. `C-C-4`
-5. `6-C-1` **[PBT]** → after constants
+1. `C-C-2` **[PBT]** (done)
+2. `C-C-1` **[PBT]** → depends on `C-C-2` (done)
+3. `C-C-3` (done)
+4. `C-C-4` (done)
+5. `6-C-1` **[PBT]** → after constants (done)
 
 ---
 
@@ -43,35 +43,35 @@ All lanes are mutually parallel.
 All lanes are mutually parallel.
 
 ### Lane 1: `src/hooks/useInteractionState.js`
-1. `2-A-1`
+1. `2-A-1` (done)
 
 ### Lane 2: `src/hooks/useSelection.js`
-1. `3-A-1`
-2. `3-A-2`
-3. `3-A-3`
-4. `3-A-4`
+1. `3-A-1` (done)
+2. `3-A-2` (done)
+3. `3-A-3` (done)
+4. `3-A-4` (done)
 > `3-A-5` deferred to Phase 5 (needs live objects map)
 
 ### Lane 3: `src/hooks/useViewport.js`
-1. `1-A-1`
-2. `1-A-2`
-3. `1-A-3` **[PBT]**
-4. `1-A-4`
-5. `1-A-5` **[PBT]**
-6. `1-A-6`
-7. `1-A-7`
-8. `1-A-8`
+1. `1-A-1` (done)
+2. `1-A-2` (done)
+3. `1-A-3` **[PBT]** (done)
+4. `1-A-4` (done)
+5. `1-A-5` **[PBT]** (done)
+6. `1-A-6` (done)
+7. `1-A-7` (done)
+8. `1-A-8` (done)
 
 ---
 
 ## Phase 3 — Board surface component (pan/zoom + event routing)
 
 ### Lane 1: `src/components/Board.jsx`
-1. `1-C-1` → depends on `1-A-*`
-2. `1-C-2` → depends on `1-C-1`
-3. `1-C-4` → depends on `1-A-5`, `1-A-6`
-4. `1-C-3` → routing skeleton (dummy `data-object-id` for testing)
-5. `1-C-5`
+1. `1-C-1` → depends on `1-A-*` (done)
+2. `1-C-2` → depends on `1-C-1` (done)
+3. `1-C-4` → depends on `1-A-5`, `1-A-6` (done)
+4. `1-C-3` → routing skeleton (dummy `data-object-id` for testing) (done)
+5. `1-C-5` (done)
 > `1-C-6` deferred to Phase 7 (needs `4-A-1`)
 
 ---
@@ -81,26 +81,26 @@ All lanes are mutually parallel.
 All lanes are mutually parallel.
 
 ### Lane 1: `src/hooks/useBoardObjects.js` — core CRUD
-1. `4-A-1` → depends on `8-A-5`
-2. `4-A-2` → depends on `4-A-1`, `4-B-1`, `C-C-3`, `C-C-4`
-3. `4-A-3` → depends on `4-A-1`
-4. `4-A-4` → depends on `4-A-1`
+1. `4-A-1` → depends on `8-A-5` (done)
+2. `4-A-2` → depends on `4-A-1`, `4-B-1`, `C-C-3`, `C-C-4` (done)
+3. `4-A-3` → depends on `4-A-1` (done)
+4. `4-A-4` → depends on `4-A-1` (done)
 > `4-A-5`, `4-A-6` deferred to Phase 5 (need drag/edit states)
 
 ### Lane 2: `src/components/ConnectionStatus.jsx`
-1. `5-A-1` → depends on `8-A-5`
-2. `5-A-2` → depends on `5-A-1`
-3. `5-A-3` → depends on `5-A-2`
+1. `5-A-1` → depends on `8-A-5` (done)
+2. `5-A-2` → depends on `5-A-1` (done)
+3. `5-A-3` → depends on `5-A-2` (done)
 
 ### Lane 3: `src/hooks/useCursors.js`
-1. `6-A-1` → depends on `8-A-5`, `1-B-*`, `4-C-*`
-2. `6-A-2` → depends on `6-A-1`
-3. `6-A-3` → depends on `6-A-2`
+1. `6-A-1` → depends on `8-A-5`, `1-B-*`, `4-C-*` (done)
+2. `6-A-2` → depends on `6-A-1` (done)
+3. `6-A-3` → depends on `6-A-2` (done)
 
 ### Lane 4: `src/hooks/usePresence.js`
-1. `7-A-1` → depends on `8-A-5`
-2. `7-A-2` → depends on `7-A-1`
-3. `7-A-3` → depends on `7-A-1`, `7-A-2`
+1. `7-A-1` → depends on `8-A-5` (done)
+2. `7-A-2` → depends on `7-A-1` (done)
+3. `7-A-3` → depends on `7-A-1`, `7-A-2` (done)
 
 **Integration invariants now feasible:** `I-11`, `I-4`
 
@@ -109,22 +109,22 @@ All lanes are mutually parallel.
 ## Phase 5 — Drag + resize hooks + sync edge behaviors
 
 ### Lane 1: `src/hooks/useDrag.js`
-1. `2-B-1` → depends on `1-B-*`, `4-A-3`, `3-A-*`
-2. `2-B-2` → depends on `2-B-1`, `4-C-*`
-3. `2-B-4` **[PBT]** → can be implemented/tested standalone
-4. `2-B-3` → depends on `2-B-2`, `4-C-2`, `2-B-4`
+1. `2-B-1` → depends on `1-B-*`, `4-A-3`, `3-A-*` (done)
+2. `2-B-2` → depends on `2-B-1`, `4-C-*` (done)
+3. `2-B-4` **[PBT]** → can be implemented/tested standalone (done)
+4. `2-B-3` → depends on `2-B-2`, `4-C-2`, `2-B-4` (done)
 
 ### Lane 2: `src/hooks/useResize.js`
-1. `2-C-1` → depends on `1-B-*`, `4-A-3`
-2. `2-C-2` **[PBT]** → depends on `2-C-1`, `4-C-*`
-3. `2-C-3` → depends on `2-C-2`, `4-C-2`
+1. `2-C-1` → depends on `1-B-*`, `4-A-3` (done)
+2. `2-C-2` **[PBT]** → depends on `2-C-1`, `4-C-*` (done)
+3. `2-C-3` → depends on `2-C-2`, `4-C-2` (done)
 
 ### Lane 3: `src/hooks/useBoardObjects.js` — sync edge cases
-1. `4-A-5` → depends on `2-B-*`
-2. `4-A-6` → depends on edit/drag states
+1. `4-A-5` → depends on `2-B-*` (done)
+2. `4-A-6` → depends on edit/drag states (done)
 
 ### Lane 4: `src/hooks/useSelection.js` — deletion reconciliation
-1. `3-A-5` → depends on `4-A-1`
+1. `3-A-5` → depends on `4-A-1` (done)
 
 **Integration invariants validated:** `I-9`, `I-5` (partial)
 
@@ -135,34 +135,34 @@ All lanes are mutually parallel.
 All lanes are mutually parallel.
 
 ### Lane 1: `src/components/SelectionOverlay.jsx`
-1. `3-B-1` → depends on `C-C-2`
-2. `3-B-2` **[PBT]** → depends on `3-B-1`
+1. `3-B-1` → depends on `C-C-2` (done)
+2. `3-B-2` **[PBT]** → depends on `3-B-1` (done)
 
 ### Lane 2: `src/components/StickyNote.jsx`
-1. `4a-A-1`
-2. `4a-A-2`
-3. `4a-A-9`
-4. `4a-A-3`
-5. `4a-A-4`
-6. `4a-A-5`
-7. `4a-A-6`
-8. `4a-A-7`
-9. `4a-A-8`
+1. `4a-A-1` (done)
+2. `4a-A-2` (done)
+3. `4a-A-9` (done)
+4. `4a-A-3` (done)
+5. `4a-A-4` (done)
+6. `4a-A-5` (done)
+7. `4a-A-6` (done)
+8. `4a-A-7` (done)
+9. `4a-A-8` (done)
 
 ### Lane 3: `src/components/Rectangle.jsx`
-1. `4b-A-1`
-2. `4b-A-2`
+1. `4b-A-1` (done)
+2. `4b-A-2` (done)
 
 ### Lane 4: `src/components/CursorOverlay.jsx`
-1. `6-B-1` → depends on `1-B-2`, viewport
-2. `6-B-2` → depends on `6-C-1`
-3. `6-B-3` → depends on `1-A-8`
+1. `6-B-1` → depends on `1-B-2`, viewport (done)
+2. `6-B-2` → depends on `6-C-1` (done)
+3. `6-B-3` → depends on `1-A-8` (done)
 
 ### Lane 5: `src/components/PresenceBar.jsx`
-1. `7-B-1`
-2. `7-B-2`
-3. `7-B-3`
-4. `7-B-4`
+1. `7-B-1` (done)
+2. `7-B-2` (done)
+3. `7-B-3` (done)
+4. `7-B-4` (done)
 
 **Integration invariants validated:** `I-6`, `I-7`
 
@@ -171,27 +171,27 @@ All lanes are mutually parallel.
 ## Phase 7 — Toolbar + color UI + loading/error + remote perception
 
 ### Lane 1: `src/components/Toolbar.jsx`
-1. `C-A-1`
-2. `C-A-2`
-3. `C-A-3`
-4. `C-A-4` → depends on `2-A-1`, `3-A-*`
+1. `C-A-1` (done)
+2. `C-A-2` (done)
+3. `C-A-3` (done)
+4. `C-A-4` → depends on `2-A-1`, `3-A-*` (done)
 
 ### Lane 2: `src/components/ColorPalette.jsx`
-1. `C-B-1`
-2. `C-B-2` → depends on `C-C-1`
-3. `C-B-3`
-4. `C-B-4` → depends on `4-A-3`
+1. `C-B-1` (done)
+2. `C-B-2` → depends on `C-C-1` (done)
+3. `C-B-3` (done)
+4. `C-B-4` → depends on `4-A-3` (done)
 
 ### Lane 3: `src/components/Board.jsx` — loading gate
-1. `1-C-6` → depends on `4-A-1`
+1. `1-C-6` → depends on `4-A-1` (done)
 
 ### Lane 4: `src/components/ErrorBanner.jsx`
-1. `5-C-1`
+1. `5-C-1` (done)
 
 ### Lane 5: Remote change perception
-1. `5-B-1` → depends on `4-A-1`
-2. `5-B-2` → depends on `4-A-1`
-3. `5-B-3` → depends on `1-B-2`, `1-A-8`
+1. `5-B-1` → depends on `4-A-1` (pending)
+2. `5-B-2` → depends on `4-A-1` (pending)
+3. `5-B-3` → depends on `1-B-2`, `1-A-8` (pending)
 
 **Integration invariants validated:** `I-1`, `I-2`, `I-3`, `I-8`, `I-10`
 
