@@ -189,9 +189,9 @@ All lanes are mutually parallel.
 1. `5-C-1` (done)
 
 ### Lane 5: Remote change perception
-1. `5-B-1` → depends on `4-A-1`
-2. `5-B-2` → depends on `4-A-1`
-3. `5-B-3` → depends on `1-B-2`, `1-A-8`
+1. `5-B-1` → depends on `4-A-1` (pending)
+2. `5-B-2` → depends on `4-A-1` (pending)
+3. `5-B-3` → depends on `1-B-2`, `1-A-8` (pending)
 
 **Integration invariants validated:** `I-1`, `I-2`, `I-3`, `I-8`, `I-10`
 

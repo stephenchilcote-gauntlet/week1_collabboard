@@ -15,6 +15,7 @@ vi.mock('firebase/database', () => ({
   onValue: (...args) => mockOnValue(...args),
   set: vi.fn(),
   update: vi.fn(),
+  remove: vi.fn(),
 }));
 
 describe('useBoardObjects', () => {

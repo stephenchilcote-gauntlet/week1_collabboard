@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { onValue, ref, set, update } from 'firebase/database';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { onValue, ref, remove, set, update } from 'firebase/database';
 import { db, BOARD_ID } from '../firebase/config.js';
 import {
   DEFAULT_RECTANGLE_COLOR,
@@ -8,7 +8,7 @@ import {
 import { generateId } from '../utils/ids.js';
 import { viewportCenter } from '../utils/coordinates.js';
 
-const createSticky = ({ x, y }) => ({
+const createSticky = ({ x, y }, user) => ({
   id: generateId(),
   type: 'sticky',
   x,
@@ -19,9 +19,12 @@ const createSticky = ({ x, y }) => ({
   text: '',
   createdAt: Date.now(),
   updatedAt: Date.now(),
+  createdBy: user?.uid ?? null,
+  updatedBy: user?.uid ?? null,
+  updatedByName: user?.displayName ?? null,
 });
 
-const createRectangleObject = ({ x, y }) => ({
+const createRectangleObject = ({ x, y }, user) => ({
   id: generateId(),
   type: 'rectangle',
   x,
@@ -31,11 +34,15 @@ const createRectangleObject = ({ x, y }) => ({
   color: DEFAULT_RECTANGLE_COLOR,
   createdAt: Date.now(),
   updatedAt: Date.now(),
+  createdBy: user?.uid ?? null,
+  updatedBy: user?.uid ?? null,
+  updatedByName: user?.displayName ?? null,
 });
 
-export const useBoardObjects = (draggingId = null, editingId = null) => {
+export const useBoardObjects = ({ user, draggingId = null, editingId = null } = {}) => {
   const [objects, setObjects] = useState({});
   const [objectsLoaded, setObjectsLoaded] = useState(false);
+  const localCreatedIds = useRef(new Set());
 
   useEffect(() => {
     const objectsRef = ref(db, `boards/${BOARD_ID}/objects`);
@@ -79,21 +86,30 @@ export const useBoardObjects = (draggingId = null, editingId = null) => {
     return update(objectRef, {
       ...updates,
       updatedAt: Date.now(),
+      updatedBy: user?.uid ?? null,
+      updatedByName: user?.displayName ?? null,
     });
-  }, []);
+  }, [user]);
 
   const createStickyNote = useCallback((panX, panY, zoom, viewportWidth, viewportHeight) => {
     const position = viewportCenter(panX, panY, zoom, viewportWidth, viewportHeight);
-    const sticky = createSticky(position);
+    const sticky = createSticky(position, user);
+    localCreatedIds.current.add(sticky.id);
     const objectRef = ref(db, `boards/${BOARD_ID}/objects/${sticky.id}`);
     return set(objectRef, sticky);
-  }, []);
+  }, [user]);
 
   const createRectangle = useCallback((panX, panY, zoom, viewportWidth, viewportHeight) => {
     const position = viewportCenter(panX, panY, zoom, viewportWidth, viewportHeight);
-    const rectangle = createRectangleObject(position);
+    const rectangle = createRectangleObject(position, user);
+    localCreatedIds.current.add(rectangle.id);
     const objectRef = ref(db, `boards/${BOARD_ID}/objects/${rectangle.id}`);
     return set(objectRef, rectangle);
+  }, [user]);
+
+  const deleteObject = useCallback((objectId) => {
+    const objectRef = ref(db, `boards/${BOARD_ID}/objects/${objectId}`);
+    return remove(objectRef);
   }, []);
 
   const value = useMemo(() => ({
@@ -102,7 +118,9 @@ export const useBoardObjects = (draggingId = null, editingId = null) => {
     updateObject,
     createStickyNote,
     createRectangle,
-  }), [objects, objectsLoaded, updateObject, createStickyNote, createRectangle]);
+    deleteObject,
+    localCreatedIds: localCreatedIds.current,
+  }), [objects, objectsLoaded, updateObject, createStickyNote, createRectangle, deleteObject]);
 
   return value;
 };
