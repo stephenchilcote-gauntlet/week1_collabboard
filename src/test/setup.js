@@ -10,6 +10,7 @@ vi.mock('../firebase/config.js', () => ({
     }),
   },
   googleProvider: {},
+  BOARD_ID: 'default',
 }));
 
 vi.mock('firebase/auth', () => ({
