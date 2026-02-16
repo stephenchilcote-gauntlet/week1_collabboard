@@ -98,9 +98,9 @@ All lanes are mutually parallel.
 3. `6-A-3` → depends on `6-A-2` (done)
 
 ### Lane 4: `src/hooks/usePresence.js`
-1. `7-A-1` → depends on `8-A-5`
-2. `7-A-2` → depends on `7-A-1`
-3. `7-A-3` → depends on `7-A-1`, `7-A-2`
+1. `7-A-1` → depends on `8-A-5` (done)
+2. `7-A-2` → depends on `7-A-1` (done)
+3. `7-A-3` → depends on `7-A-1`, `7-A-2` (done)
 
 **Integration invariants now feasible:** `I-11`, `I-4`
 

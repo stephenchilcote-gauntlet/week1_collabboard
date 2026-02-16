@@ -39,6 +39,7 @@ describe('ConnectionStatus', () => {
 
     const { queryByText } = render(<ConnectionStatus />);
     await Promise.resolve();
+    await Promise.resolve();
     expect(queryByText('Connection lost — reconnecting…')).toBeNull();
   });
 });
