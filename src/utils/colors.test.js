@@ -3,6 +3,8 @@ import { test, fc } from '@fast-check/vitest';
 import {
   OBJECT_COLORS,
   SELECTION_COLOR,
+  ERROR_COLOR,
+  WARNING_COLOR,
   DEFAULT_RECTANGLE_COLOR,
   DEFAULT_STICKY_COLOR,
   cursorColorFromUid,
@@ -18,8 +20,8 @@ describe('colors', () => {
     'object colors exclude selection and error colors',
     (color) => {
       expect(color).not.toBe(SELECTION_COLOR);
-      expect(color).not.toBe('#FF0000');
-      expect(color).not.toBe('#F59E0B');
+      expect(color).not.toBe(ERROR_COLOR);
+      expect(color).not.toBe(WARNING_COLOR);
     },
   );
 
