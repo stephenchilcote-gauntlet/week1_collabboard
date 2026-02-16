@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom';
+import '@fast-check/vitest';
 import { vi } from 'vitest';
 
 vi.mock('../firebase/config.js', () => ({
