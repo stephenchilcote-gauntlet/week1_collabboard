@@ -43,7 +43,7 @@ All lanes are mutually parallel.
 All lanes are mutually parallel.
 
 ### Lane 1: `src/hooks/useInteractionState.js`
-1. `2-A-1`
+1. `2-A-1` (done)
 
 ### Lane 2: `src/hooks/useSelection.js`
 1. `3-A-1`
