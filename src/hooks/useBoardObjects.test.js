@@ -1,0 +1,52 @@
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { renderHook } from '@testing-library/react';
+import { useBoardObjects } from './useBoardObjects.js';
+
+const mockOnValue = vi.fn();
+const mockRef = vi.fn();
+
+vi.mock('../firebase/config.js', () => ({
+  db: {},
+  BOARD_ID: 'default',
+}));
+
+vi.mock('firebase/database', () => ({
+  ref: (...args) => mockRef(...args),
+  onValue: (...args) => mockOnValue(...args),
+  set: vi.fn(),
+  update: vi.fn(),
+}));
+
+describe('useBoardObjects', () => {
+  beforeEach(() => {
+    mockOnValue.mockReset();
+    mockRef.mockReset();
+  });
+
+  it('subscribes to the board objects path and marks loaded', () => {
+    const unsubscribe = vi.fn();
+    mockOnValue.mockImplementation((_ref, callback) => {
+      callback({ val: () => ({}) });
+      return unsubscribe;
+    });
+
+    const { result, unmount } = renderHook(() => useBoardObjects());
+
+    expect(mockRef).toHaveBeenCalledWith({}, 'boards/default/objects');
+    expect(result.current.objectsLoaded).toBe(true);
+
+    unmount();
+    expect(unsubscribe).toHaveBeenCalled();
+  });
+
+  it('returns objects from snapshots', () => {
+    const unsubscribe = vi.fn();
+    mockOnValue.mockImplementation((_ref, callback) => {
+      callback({ val: () => ({ obj: { id: 'obj' } }) });
+      return unsubscribe;
+    });
+
+    const { result } = renderHook(() => useBoardObjects());
+    expect(result.current.objects).toEqual({ obj: { id: 'obj' } });
+  });
+});

@@ -81,10 +81,10 @@ All lanes are mutually parallel.
 All lanes are mutually parallel.
 
 ### Lane 1: `src/hooks/useBoardObjects.js` — core CRUD
-1. `4-A-1` → depends on `8-A-5`
-2. `4-A-2` → depends on `4-A-1`, `4-B-1`, `C-C-3`, `C-C-4`
-3. `4-A-3` → depends on `4-A-1`
-4. `4-A-4` → depends on `4-A-1`
+1. `4-A-1` → depends on `8-A-5` (done)
+2. `4-A-2` → depends on `4-A-1`, `4-B-1`, `C-C-3`, `C-C-4` (done)
+3. `4-A-3` → depends on `4-A-1` (done)
+4. `4-A-4` → depends on `4-A-1` (done)
 > `4-A-5`, `4-A-6` deferred to Phase 5 (need drag/edit states)
 
 ### Lane 2: `src/components/ConnectionStatus.jsx`
