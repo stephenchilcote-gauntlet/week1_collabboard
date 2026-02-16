@@ -1,7 +1,13 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
-export const useSelection = () => {
+export const useSelection = (objects = {}) => {
   const [selectedId, setSelectedId] = useState(null);
+
+  useEffect(() => {
+    if (selectedId && !objects[selectedId]) {
+      setSelectedId(null);
+    }
+  }, [objects, selectedId]);
 
   const select = useCallback((objectId) => {
     setSelectedId(objectId);

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useViewport } from '../hooks/useViewport.js';
+import { useBoardObjects } from '../hooks/useBoardObjects.js';
 
 export default function Board() {
   const boardRef = useRef(null);
@@ -12,6 +13,7 @@ export default function Board() {
     handlePanEnd,
     handleZoom,
   } = useViewport(boardRef);
+  const { objectsLoaded } = useBoardObjects();
 
   useEffect(() => {
     const boardEl = boardRef.current;
@@ -79,6 +81,22 @@ export default function Board() {
       onPointerUp={handlePointerEnd}
       onPointerCancel={handlePointerEnd}
     >
+      {!objectsLoaded && (
+        <div
+          data-testid="board-loading"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#6b7280',
+            fontWeight: 600,
+          }}
+        >
+          Loading board…
+        </div>
+      )}
       <div
         data-testid="board-inner"
         style={{
@@ -88,6 +106,7 @@ export default function Board() {
           transformOrigin: '0 0',
           backgroundImage: 'radial-gradient(circle, rgba(0,0,0,0.06) 1px, transparent 1px)',
           backgroundSize: '20px 20px',
+          opacity: objectsLoaded ? 1 : 0.4,
         }}
       />
     </div>

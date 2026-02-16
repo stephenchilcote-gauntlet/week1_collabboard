@@ -9,7 +9,7 @@ describe('useSelection', () => {
   });
 
   it('selects an object id', () => {
-    const { result } = renderHook(() => useSelection());
+    const { result } = renderHook(() => useSelection({ 'object-1': { id: 'object-1' } }));
 
     act(() => {
       result.current.select('object-1');
@@ -19,7 +19,7 @@ describe('useSelection', () => {
   });
 
   it('clears selection', () => {
-    const { result } = renderHook(() => useSelection());
+    const { result } = renderHook(() => useSelection({}));
 
     act(() => {
       result.current.select('object-2');
@@ -29,6 +29,19 @@ describe('useSelection', () => {
       result.current.clearSelection();
     });
 
+    expect(result.current.selectedId).toBeNull();
+  });
+
+  it('clears selection when object is removed', () => {
+    const { result, rerender } = renderHook(({ objects }) => useSelection(objects), {
+      initialProps: { objects: { obj: { id: 'obj' } } },
+    });
+
+    act(() => {
+      result.current.select('obj');
+    });
+
+    rerender({ objects: {} });
     expect(result.current.selectedId).toBeNull();
   });
 });

@@ -22,6 +22,10 @@ vi.mock('../hooks/useViewport.js', () => ({
   })),
 }));
 
+vi.mock('../hooks/useBoardObjects.js', () => ({
+  useBoardObjects: vi.fn(() => ({ objectsLoaded: true })),
+}));
+
 describe('Board', () => {
   beforeEach(() => {
     vi.clearAllMocks();
