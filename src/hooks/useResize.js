@@ -43,19 +43,24 @@ export const clampResize = (bounds, handle, dx, dy) => {
   return { x, y, width, height };
 };
 
-export const useResize = (viewport, updateObject) => {
+export const useResize = (viewport, updateObject, onResizeStateChange) => {
   const [resizingId, setResizingId] = useState(null);
   const initialBounds = useRef(null);
   const handleRef = useRef(null);
   const startPointer = useRef({ x: 0, y: 0 });
   const throttledUpdate = useRef(throttle(updateObject, 50));
 
+  const updateResizingId = useCallback((nextId) => {
+    setResizingId(nextId);
+    onResizeStateChange?.(nextId);
+  }, [onResizeStateChange]);
+
   const handleResizeStart = useCallback((object, handlePosition, containerX, containerY) => {
-    setResizingId(object.id);
+    updateResizingId(object.id);
     initialBounds.current = { x: object.x, y: object.y, width: object.width, height: object.height };
     handleRef.current = handlePosition;
     startPointer.current = { x: containerX, y: containerY };
-  }, []);
+  }, [updateResizingId]);
 
   const handleResizeMove = useCallback((containerX, containerY) => {
     if (!resizingId || !initialBounds.current || !handleRef.current) {
@@ -74,10 +79,10 @@ export const useResize = (viewport, updateObject) => {
       return;
     }
     throttledUpdate.current.flush?.();
-    setResizingId(null);
+    updateResizingId(null);
     initialBounds.current = null;
     handleRef.current = null;
-  }, [resizingId]);
+  }, [resizingId, updateResizingId]);
 
   return {
     resizingId,
