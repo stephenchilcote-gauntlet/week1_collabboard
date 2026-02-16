@@ -189,7 +189,21 @@ getBoardState() // returns current objects for context
 ## File Structure
 
 ```
-[tbd - update me!]
+├── src/
+│   ├── components/       # React components (Board, StickyNote, etc.)
+│   ├── firebase/
+│   │   └── config.js     # Firebase init (db, auth, googleProvider)
+│   ├── test/
+│   │   └── setup.js      # Vitest setup + Firebase mocks
+│   ├── App.jsx           # Root component (auth gate + board)
+│   ├── App.test.jsx      # App-level tests
+│   └── main.jsx          # Entry point
+├── functions/
+│   └── index.js          # Cloud Function (AI proxy)
+├── firebase.json         # Firebase config (hosting, functions, db rules)
+├── database.rules.json   # Realtime DB security rules
+├── .env.example          # Required env vars template
+└── vite.config.js        # Vite + Vitest config
 ```
 
 ---
