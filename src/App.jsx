@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { auth, googleProvider } from './firebase/config.js';
 import { signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
+import Board from './components/Board.jsx';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -39,9 +40,7 @@ export default function App() {
         <span>{user.displayName}</span>
         <button onClick={handleSignOut} style={{ padding: '4px 8px', cursor: 'pointer' }}>Sign Out</button>
       </div>
-      <div style={{ width: '100%', height: '100%', background: '#f5f5f5', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <p style={{ color: '#999' }}>Board goes here</p>
-      </div>
+      <Board />
     </div>
   );
 }

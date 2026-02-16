@@ -67,11 +67,11 @@ All lanes are mutually parallel.
 ## Phase 3 — Board surface component (pan/zoom + event routing)
 
 ### Lane 1: `src/components/Board.jsx`
-1. `1-C-1` → depends on `1-A-*`
-2. `1-C-2` → depends on `1-C-1`
-3. `1-C-4` → depends on `1-A-5`, `1-A-6`
-4. `1-C-3` → routing skeleton (dummy `data-object-id` for testing)
-5. `1-C-5`
+1. `1-C-1` → depends on `1-A-*` (done)
+2. `1-C-2` → depends on `1-C-1` (done)
+3. `1-C-4` → depends on `1-A-5`, `1-A-6` (done)
+4. `1-C-3` → routing skeleton (dummy `data-object-id` for testing) (done)
+5. `1-C-5` (done)
 > `1-C-6` deferred to Phase 7 (needs `4-A-1`)
 
 ---
