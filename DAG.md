@@ -30,11 +30,11 @@ All lanes are mutually parallel.
 2. `4-C-2` **[PBT]** → depends on `4-C-1` (done)
 
 ### Lane 5: `src/utils/colors.js`
-1. `C-C-2` **[PBT]**
-2. `C-C-1` **[PBT]** → depends on `C-C-2`
-3. `C-C-3`
-4. `C-C-4`
-5. `6-C-1` **[PBT]** → after constants
+1. `C-C-2` **[PBT]** (done)
+2. `C-C-1` **[PBT]** → depends on `C-C-2` (done)
+3. `C-C-3` (done)
+4. `C-C-4` (done)
+5. `6-C-1` **[PBT]** → after constants (done)
 
 ---
 
