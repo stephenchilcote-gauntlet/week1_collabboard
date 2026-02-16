@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { auth, googleProvider } from './firebase/config.js';
 import { signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
 import Board from './components/Board.jsx';
+import ConnectionStatus from './components/ConnectionStatus.jsx';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -36,6 +37,7 @@ export default function App() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', overflow: 'hidden' }}>
+      <ConnectionStatus />
       <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 100, display: 'flex', alignItems: 'center', gap: '8px' }}>
         <span>{user.displayName}</span>
         <button onClick={handleSignOut} style={{ padding: '4px 8px', cursor: 'pointer' }}>Sign Out</button>

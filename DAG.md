@@ -88,9 +88,9 @@ All lanes are mutually parallel.
 > `4-A-5`, `4-A-6` deferred to Phase 5 (need drag/edit states)
 
 ### Lane 2: `src/components/ConnectionStatus.jsx`
-1. `5-A-1` → depends on `8-A-5`
-2. `5-A-2` → depends on `5-A-1`
-3. `5-A-3` → depends on `5-A-2`
+1. `5-A-1` → depends on `8-A-5` (done)
+2. `5-A-2` → depends on `5-A-1` (done)
+3. `5-A-3` → depends on `5-A-2` (done)
 
 ### Lane 3: `src/hooks/useCursors.js`
 1. `6-A-1` → depends on `8-A-5`, `1-B-*`, `4-C-*`
