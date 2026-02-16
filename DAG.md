@@ -18,9 +18,9 @@ All lanes are mutually parallel.
 1. `8-A-5` (done)
 
 ### Lane 2: `src/utils/coordinates.js`
-1. `1-B-1` **[PBT]**
-2. `1-B-2` **[PBT]**
-3. `1-B-3` **[PBT]**
+1. `1-B-1` **[PBT]** (done)
+2. `1-B-2` **[PBT]** (done)
+3. `1-B-3` **[PBT]** (done)
 
 ### Lane 3: `src/utils/ids.js`
 1. `4-B-1` **[PBT]**
