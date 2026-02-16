@@ -26,8 +26,8 @@ All lanes are mutually parallel.
 1. `4-B-1` **[PBT]** (done)
 
 ### Lane 4: `src/utils/throttle.js`
-1. `4-C-1` **[PBT]**
-2. `4-C-2` **[PBT]** → depends on `4-C-1`
+1. `4-C-1` **[PBT]** (done)
+2. `4-C-2` **[PBT]** → depends on `4-C-1` (done)
 
 ### Lane 5: `src/utils/colors.js`
 1. `C-C-2` **[PBT]**
