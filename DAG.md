@@ -46,21 +46,21 @@ All lanes are mutually parallel.
 1. `2-A-1` (done)
 
 ### Lane 2: `src/hooks/useSelection.js`
-1. `3-A-1`
-2. `3-A-2`
-3. `3-A-3`
-4. `3-A-4`
+1. `3-A-1` (done)
+2. `3-A-2` (done)
+3. `3-A-3` (done)
+4. `3-A-4` (done)
 > `3-A-5` deferred to Phase 5 (needs live objects map)
 
 ### Lane 3: `src/hooks/useViewport.js`
-1. `1-A-1`
-2. `1-A-2`
-3. `1-A-3` **[PBT]**
-4. `1-A-4`
-5. `1-A-5` **[PBT]**
-6. `1-A-6`
-7. `1-A-7`
-8. `1-A-8`
+1. `1-A-1` (done)
+2. `1-A-2` (done)
+3. `1-A-3` **[PBT]** (done)
+4. `1-A-4` (done)
+5. `1-A-5` **[PBT]** (done)
+6. `1-A-6` (done)
+7. `1-A-7` (done)
+8. `1-A-8` (done)
 
 ---
 
