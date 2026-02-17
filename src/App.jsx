@@ -246,7 +246,7 @@ const BoardShell = ({ user }) => {
         onResizeEnd={handleResizeEnd}
         onCursorMove={(x, y) => updateCursor(x, y, viewport.panX, viewport.panY, viewport.zoom)}
       />
-      <CursorOverlay cursors={cursors} viewport={viewport} />
+      <CursorOverlay cursors={cursors} viewport={viewport} currentUid={user.uid} />
       <div style={{
         position: 'fixed',
         bottom: 12,

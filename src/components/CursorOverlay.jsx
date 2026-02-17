@@ -1,7 +1,7 @@
 import { boardToScreen } from '../utils/coordinates.js';
 import { cursorColorFromUid } from '../utils/colors.js';
 
-export default function CursorOverlay({ cursors, viewport }) {
+export default function CursorOverlay({ cursors, viewport, currentUid }) {
   const { panX, panY, zoom, viewportWidth, viewportHeight } = viewport;
 
   return (
@@ -12,7 +12,7 @@ export default function CursorOverlay({ cursors, viewport }) {
         pointerEvents: 'none',
       }}
     >
-      {Object.values(cursors).map((cursor) => {
+      {Object.values(cursors).filter((cursor) => cursor.uid !== currentUid).map((cursor) => {
         const point = boardToScreen(cursor.x, cursor.y, panX, panY, zoom);
         if (point.x < 0 || point.y < 0 || point.x > viewportWidth || point.y > viewportHeight) {
           return null;

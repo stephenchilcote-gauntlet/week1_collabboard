@@ -24,4 +24,20 @@ describe('CursorOverlay', () => {
 
     expect(container.querySelector('svg')).toBeInTheDocument();
   });
+
+  it('hides the current user cursor', () => {
+    const { queryByText, getByText } = render(
+      <CursorOverlay
+        cursors={{
+          me: { uid: 'me', name: 'Me', x: 10, y: 20 },
+          other: { uid: 'other', name: 'Other', x: 30, y: 40 },
+        }}
+        viewport={{ panX: 0, panY: 0, zoom: 1, viewportWidth: 800, viewportHeight: 600 }}
+        currentUid="me"
+      />,
+    );
+
+    expect(queryByText('Me')).not.toBeInTheDocument();
+    expect(getByText('Other')).toBeInTheDocument();
+  });
 });
