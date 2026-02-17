@@ -32,6 +32,11 @@ npm run build
 firebase deploy
 ```
 
+## CI/CD
+
+GitHub Actions deploys on `main` to Firebase Hosting and database rules. Configure the repository secret:
+- `FIREBASE_SERVICE_ACCOUNT`: Firebase service account JSON for the project.
+
 ## Firebase
 
 Ensure your `.env` is populated (see `.env.example`) and the Realtime Database rules in `database.rules.json` are deployed.
