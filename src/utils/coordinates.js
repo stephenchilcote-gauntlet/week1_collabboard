@@ -33,3 +33,24 @@ export const intersectsRect = (a, b) => (
   && a.y <= b.y + b.height
   && a.y + a.height >= b.y
 );
+
+export const containsRect = (outer, inner) => (
+  outer.x <= inner.x
+  && outer.y <= inner.y
+  && outer.x + outer.width >= inner.x + inner.width
+  && outer.y + outer.height >= inner.y + inner.height
+);
+
+export const getObjectBounds = (obj) => {
+  if (typeof obj.x1 === 'number' && typeof obj.y1 === 'number') {
+    const x = Math.min(obj.x1, obj.x2);
+    const y = Math.min(obj.y1, obj.y2);
+    return { x, y, width: Math.abs(obj.x2 - obj.x1), height: Math.abs(obj.y2 - obj.y1) };
+  }
+  return {
+    x: obj.x,
+    y: obj.y,
+    width: obj.width ?? 0,
+    height: obj.height ?? 0,
+  };
+};

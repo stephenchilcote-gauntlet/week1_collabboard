@@ -202,10 +202,10 @@ describe('Board', () => {
     expect(getByTestId('selection-marquee')).toBeInTheDocument();
   });
 
-  it('shows grab cursor by default', () => {
+  it('shows default cursor by default', () => {
     const { getByTestId } = render(<Board {...baseProps} selectedIds={new Set()} />);
     const outer = getByTestId('board-outer');
-    expect(outer.style.cursor).toBe('grab');
+    expect(outer.style.cursor).toBe('default');
   });
 
   it('shows empty board hint when no objects are loaded', () => {

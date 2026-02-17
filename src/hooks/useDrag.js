@@ -39,8 +39,13 @@ export const useDrag = (viewport, updateObject, selectObject, onDragStateChange)
       dragAnchor.current = { x: point.x - object.x, y: point.y - object.y };
     }
     if (selectedObjects) {
+      const throttles = {};
+      selectedObjects.forEach((item) => {
+        throttles[item.id] = throttle((...args) => updateObjectRef.current(...args), 50);
+      });
       multiUpdateRef.current = {
         startPoint: point,
+        throttles,
         items: selectedObjects.map((item) => ({
           id: item.id,
           x: item.x,
@@ -68,16 +73,18 @@ export const useDrag = (viewport, updateObject, selectObject, onDragStateChange)
     if (multiUpdateRef.current) {
       const dx = point.x - multiUpdateRef.current.startPoint.x;
       const dy = point.y - multiUpdateRef.current.startPoint.y;
+      const { throttles } = multiUpdateRef.current;
       multiUpdateRef.current.items.forEach((item) => {
+        const itemThrottle = throttles[item.id] ?? throttledUpdate.current;
         if (typeof item.x1 === 'number' && typeof item.y1 === 'number') {
-          throttledUpdate.current(item.id, {
+          itemThrottle(item.id, {
             x1: item.x1 + dx,
             y1: item.y1 + dy,
             x2: item.x2 + dx,
             y2: item.y2 + dy,
           });
         } else {
-          throttledUpdate.current(item.id, {
+          itemThrottle(item.id, {
             x: item.x + dx,
             y: item.y + dy,
           });
@@ -119,7 +126,11 @@ export const useDrag = (viewport, updateObject, selectObject, onDragStateChange)
     const dx = containerX - startPointer.current.x;
     const dy = containerY - startPointer.current.y;
     if (!isClickThreshold(dx, dy)) {
-      throttledUpdate.current.flush?.();
+      if (multiUpdateRef.current?.throttles) {
+        Object.values(multiUpdateRef.current.throttles).forEach((t) => t.flush?.());
+      } else {
+        throttledUpdate.current.flush?.();
+      }
     }
     updateDraggingId(null);
     multiUpdateRef.current = null;

@@ -72,4 +72,24 @@ describe('Frame', () => {
     expect(onSelect).not.toHaveBeenCalled();
     expect(onDragStart).not.toHaveBeenCalled();
   });
+
+  it('uses default colors when no color is set', () => {
+    const { getByTestId } = renderFrame();
+
+    const frame = getByTestId('frame');
+    expect(frame.style.background).toContain('rgba');
+  });
+
+  it('applies custom color to border, background, and title bar', () => {
+    const { getByTestId } = renderFrame({
+      object: { ...defaultObject, color: '#FF6B6B' },
+    });
+
+    const frame = getByTestId('frame');
+    expect(frame.style.border).toContain('rgb(255, 107, 107)');
+    expect(frame.style.background).toContain('255, 107, 107');
+
+    const titleBar = getByTestId('frame-title');
+    expect(titleBar.style.background).toContain('255, 107, 107');
+  });
 });
