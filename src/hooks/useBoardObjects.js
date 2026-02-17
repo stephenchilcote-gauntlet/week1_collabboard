@@ -48,38 +48,12 @@ export const useBoardObjects = ({ user, draggingId = null, editingId = null } = 
     const objectsRef = ref(db, `boards/${BOARD_ID}/objects`);
     const unsubscribe = onValue(objectsRef, (snapshot) => {
       const next = snapshot.val() ?? {};
-      setObjects((prev) => {
-        if (!draggingId) {
-          return next;
-        }
-        const current = prev[draggingId];
-        if (!current || !next[draggingId]) {
-          return next;
-        }
-        return {
-          ...next,
-          [draggingId]: {
-            ...next[draggingId],
-            x: current.x,
-            y: current.y,
-          },
-        };
-      });
-      if (editingId && !next[editingId]) {
-        setObjects((prev) => {
-          if (prev[editingId]) {
-            const updated = { ...prev };
-            delete updated[editingId];
-            return updated;
-          }
-          return prev;
-        });
-      }
+      setObjects(next);
       setObjectsLoaded(true);
     });
 
     return () => unsubscribe();
-  }, [draggingId, editingId]);
+  }, []);
 
   const updateObject = useCallback((objectId, updates) => {
     const objectRef = ref(db, `boards/${BOARD_ID}/objects/${objectId}`);

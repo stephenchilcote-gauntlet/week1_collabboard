@@ -185,6 +185,13 @@ const BoardShell = ({ user }) => {
   );
 };
 
+const getFirebaseAuthTroubleshooting = () => (
+  'Sign-in is not configured for this Firebase project. '
+  + 'Enable Google in Firebase Console > Authentication > Sign-in method, '
+  + 'add your Hosting domain (ex: collabboard-g4-sjc.web.app) and localhost to Authorized domains, '
+  + 'then restart the dev server.'
+);
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -201,6 +208,10 @@ export default function App() {
   const handleSignIn = () => {
     setSignInError('');
     signInWithPopup(auth, googleProvider).catch((error) => {
+      if (error?.code === 'auth/configuration-not-found') {
+        setSignInError(getFirebaseAuthTroubleshooting());
+        return;
+      }
       setSignInError(error.message || 'Unable to sign in. Please try again.');
     });
   };

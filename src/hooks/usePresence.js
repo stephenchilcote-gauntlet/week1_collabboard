@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { onDisconnect, onValue, ref, remove, set, update } from 'firebase/database';
-import { db, BOARD_ID } from '../firebase/config.js';
+import { auth, db, BOARD_ID } from '../firebase/config.js';
 
 const HEARTBEAT_INTERVAL_MS = 5000;
 const PRESENCE_TTL_MS = 15000;
@@ -59,7 +59,9 @@ export const usePresence = (user) => {
       unregisterHeartbeat();
       unsubscribeConnected();
       unsubscribeList();
-      remove(presenceRef);
+      if (user?.uid && auth.currentUser) {
+        remove(presenceRef);
+      }
     };
   }, [user]);
 

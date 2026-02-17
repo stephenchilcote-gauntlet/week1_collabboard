@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { onDisconnect, onValue, ref, set, update } from 'firebase/database';
-import { db, BOARD_ID } from '../firebase/config.js';
+import { auth, db, BOARD_ID } from '../firebase/config.js';
 import { screenToBoard } from '../utils/coordinates.js';
 import { throttle } from '../utils/throttle.js';
 
@@ -39,11 +39,13 @@ export const useCursors = (user) => {
     return () => {
       throttledRef.current?.flush();
       throttledRef.current = null;
-      update(userCursorRef, {
-        x: null,
-        y: null,
-        updatedAt: Date.now(),
-      });
+      if (user?.uid && auth.currentUser) {
+        update(userCursorRef, {
+          x: null,
+          y: null,
+          updatedAt: Date.now(),
+        });
+      }
       unsubscribe();
     };
   }, [user]);

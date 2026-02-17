@@ -34,4 +34,9 @@ firebase deploy
 
 ## Firebase
 
-Update Firebase config in `src/firebase/config.js` and ensure the Realtime Database rules in `database.rules.json` are deployed.
+Ensure your `.env` is populated (see `.env.example`) and the Realtime Database rules in `database.rules.json` are deployed.
+
+Sign-in troubleshooting (auth/configuration-not-found):
+- Firebase Console > Authentication > Sign-in method > Google > Enable
+- Firebase Console > Authentication > Settings > Authorized domains: add `localhost` and your Hosting domain (ex: `collabboard-g4-sjc.web.app`)
+- Restart the dev server after updating `.env`
