@@ -28,6 +28,7 @@ export default function Board({
   user,
   localCreatedIds,
   selectedId,
+  lockedObjectIds,
   onSelect,
   onClearSelection,
   onUpdateObject,
@@ -383,6 +384,8 @@ export default function Board({
       >
         {sortedObjects.map((object) => {
           const remoteEntryPhase = remoteEntryPhases[object.id];
+          const lockEntry = lockedObjectIds?.[object.id];
+          const lockedByOther = Boolean(lockEntry);
           const isRemoteDragActive = Boolean(
             user
             && object.updatedBy
@@ -396,6 +399,7 @@ export default function Board({
                 <StickyNote
                   object={object}
                   isSelected={object.id === selectedId}
+                  lockedByOther={lockedByOther}
                   onSelect={onSelect}
                   onUpdate={handleObjectUpdate}
                   onDragStart={handleObjectDragStart}
@@ -407,6 +411,7 @@ export default function Board({
                 <Rectangle
                   object={object}
                   isSelected={object.id === selectedId}
+                  lockedByOther={lockedByOther}
                   onSelect={onSelect}
                   onUpdate={handleObjectUpdate}
                   onDragStart={handleObjectDragStart}
@@ -432,6 +437,27 @@ export default function Board({
                   }}
                 >
                   {object.updatedByName ?? 'Anonymous'}
+                </div>
+              )}
+              {lockedByOther && (
+                <div
+                  data-testid="remote-selection-label"
+                  style={{
+                    position: 'absolute',
+                    left: object.x,
+                    top: object.y - 22,
+                    padding: '2px 8px',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    background: '#3b82f6',
+                    color: '#fff',
+                    borderRadius: 4,
+                    whiteSpace: 'nowrap',
+                    zIndex: (object.zIndex ?? 0) + 2,
+                    pointerEvents: 'none',
+                  }}
+                >
+                  {lockEntry.name}
                 </div>
               )}
             </div>

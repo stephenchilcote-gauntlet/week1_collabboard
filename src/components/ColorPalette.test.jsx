@@ -12,6 +12,6 @@ describe('ColorPalette', () => {
 
     const swatches = getAllByTestId('color-swatch');
     fireEvent.click(swatches[1]);
-    expect(onChangeColor).toHaveBeenCalledWith('obj1', OBJECT_COLORS[1]);
+    expect(onChangeColor).toHaveBeenCalledWith('obj1', { color: OBJECT_COLORS[1] });
   });
 });

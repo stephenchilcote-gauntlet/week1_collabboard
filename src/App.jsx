@@ -17,6 +17,7 @@ import { useSelection } from './hooks/useSelection.js';
 import { useCursors } from './hooks/useCursors.js';
 import { usePresence } from './hooks/usePresence.js';
 import { useInteractionState } from './hooks/useInteractionState.js';
+import { boardToScreen } from './utils/coordinates.js';
 
 const BoardShell = ({ user }) => {
   const [errorMessage, setErrorMessage] = useState('');
@@ -36,7 +37,7 @@ const BoardShell = ({ user }) => {
     draggingId: interactionState.mode === 'dragging' ? interactionState.activeObjectId : null,
     editingId: interactionState.mode === 'editing' ? interactionState.activeObjectId : null,
   });
-  const selection = useSelection(objects);
+  const selection = useSelection(objects, user);
   const {
     handleDragStart: dragStart,
     handleDragMove,
@@ -151,12 +152,27 @@ const BoardShell = ({ user }) => {
         selectedId={selection.selectedId}
         interactionMode={interactionState.mode}
       />
-      <div style={{ position: 'fixed', left: 12, top: 'calc(50% + 140px)', zIndex: 160 }}>
-        <ColorPalette
-          selectedObject={selection.selectedId ? objects?.[selection.selectedId] : null}
-          onChangeColor={handleUpdateObject}
-        />
-      </div>
+      {(() => {
+        const selObj = selection.selectedId ? objects?.[selection.selectedId] : null;
+        if (!selObj) return null;
+        const { panX, panY, zoom } = viewport;
+        const screenPos = boardToScreen(selObj.x, selObj.y + (selObj.height ?? 0), panX, panY, zoom);
+        return (
+          <div style={{
+            position: 'absolute',
+            left: screenPos.x,
+            top: screenPos.y + 8,
+            zIndex: 160,
+            transform: 'translateX(-50%)',
+            marginLeft: ((selObj.width ?? 0) * zoom) / 2,
+          }}>
+            <ColorPalette
+              selectedObject={selObj}
+              onChangeColor={handleUpdateObject}
+            />
+          </div>
+        );
+      })()}
       <Board
         boardRef={boardRef}
         viewport={viewport}
@@ -165,6 +181,7 @@ const BoardShell = ({ user }) => {
         user={user}
         localCreatedIds={localCreatedIds}
         selectedId={selection.selectedId}
+        lockedObjectIds={selection.lockedObjectIds}
         onSelect={selection.select}
         onClearSelection={handleClearSelection}
         onUpdateObject={handleUpdateObject}

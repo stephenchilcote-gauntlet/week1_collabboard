@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { isClickThreshold } from '../hooks/useDrag.js';
 
 export default function StickyNote({
   object,
   isSelected,
+  lockedByOther,
   onSelect,
   onUpdate,
   onDragStart,
@@ -13,35 +15,76 @@ export default function StickyNote({
   const [isEditing, setIsEditing] = useState(false);
   const [draftText, setDraftText] = useState(object.text ?? '');
   const textRef = useRef(null);
-
-  useEffect(() => {
-    setDraftText(object.text ?? '');
-  }, [object.text]);
-
-  useEffect(() => {
-    if (isEditing) {
-      textRef.current?.focus();
-      onEditStateChange?.(object.id, true);
-    }
-  }, [isEditing, object.id, onEditStateChange]);
+  const pendingDragRef = useRef(null);
 
   useEffect(() => {
     if (!isEditing) {
-      onEditStateChange?.(object.id, false);
+      setDraftText(object.text ?? '');
+    }
+  }, [object.text, isEditing]);
+
+  const prevEditingRef = useRef(false);
+  useEffect(() => {
+    if (isEditing) {
+      textRef.current?.focus();
+    }
+    if (isEditing !== prevEditingRef.current) {
+      prevEditingRef.current = isEditing;
+      onEditStateChange?.(object.id, isEditing);
     }
   }, [isEditing, object.id, onEditStateChange]);
 
+  const cleanupPendingDrag = () => {
+    if (pendingDragRef.current) {
+      document.removeEventListener('pointermove', pendingDragRef.current.onMove);
+      document.removeEventListener('pointerup', pendingDragRef.current.onUp);
+      pendingDragRef.current = null;
+    }
+  };
+
+  useEffect(() => cleanupPendingDrag, []);
+
   const handleDoubleClick = (event) => {
+    if (lockedByOther) {
+      return;
+    }
     event.stopPropagation();
     setIsEditing(true);
   };
 
   const handlePointerDown = (event) => {
+    if (lockedByOther) {
+      return;
+    }
     onSelect(object.id);
     if (isEditing) {
       return;
     }
-    onDragStart(object, event);
+    if (!isSelected) {
+      onDragStart(object, event);
+      return;
+    }
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const origEvent = event.nativeEvent;
+
+    const onMove = (moveEvent) => {
+      const dx = moveEvent.clientX - startX;
+      const dy = moveEvent.clientY - startY;
+      if (!isClickThreshold(dx, dy)) {
+        cleanupPendingDrag();
+        onDragStart(object, origEvent);
+      }
+    };
+
+    const onUp = () => {
+      cleanupPendingDrag();
+    };
+
+    cleanupPendingDrag();
+    pendingDragRef.current = { onMove, onUp };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp, { once: true });
   };
 
   const handleBlur = () => {
@@ -64,13 +107,17 @@ export default function StickyNote({
     const end = target.selectionEnd;
     const next = `${draftText.slice(0, start)}${pasteText}${draftText.slice(end)}`;
     setDraftText(next);
+    const pos = start + pasteText.length;
+    requestAnimationFrame(() => {
+      target.setSelectionRange(pos, pos);
+    });
   };
 
   const handleTextPointerDown = (event) => {
     event.stopPropagation();
   };
 
-  const cursor = isEditing ? 'text' : isSelected ? 'grabbing' : 'grab';
+  const cursor = lockedByOther ? 'not-allowed' : isEditing ? 'text' : isSelected ? 'grabbing' : 'grab';
   const isEntering = remoteEntryPhase === 'initial';
   const isHighlighted = remoteEntryPhase === 'active';
 
@@ -96,8 +143,9 @@ export default function StickyNote({
         zIndex: object.zIndex,
         cursor,
         userSelect: isEditing ? 'text' : 'none',
-        opacity: isEntering ? 0 : 1,
-        transition: 'opacity 300ms ease, box-shadow 300ms ease',
+        opacity: isEntering ? 0 : lockedByOther ? 0.5 : 1,
+        filter: lockedByOther ? 'grayscale(60%)' : 'none',
+        transition: 'opacity 300ms ease, box-shadow 300ms ease, filter 300ms ease',
         boxShadow: isHighlighted ? '0 0 0 4px rgba(59, 130, 246, 0.35)' : 'none',
         overflow: 'hidden',
       }}
