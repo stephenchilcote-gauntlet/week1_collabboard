@@ -11,6 +11,8 @@ export default function Toolbar({
   onDeleteSelected,
   selectedId,
   interactionMode,
+  connectorMode,
+  connectorFromId,
 }) {
   const [hoveredButton, setHoveredButton] = useState(null);
   useEffect(() => {
@@ -184,7 +186,10 @@ export default function Toolbar({
         onMouseLeave={() => setHoveredButton(null)}
         style={{
           cursor: 'pointer',
-          background: hoveredButton === 'connector' ? 'rgba(0,0,0,0.08)' : 'transparent',
+          background: connectorMode
+            ? '#bfdbfe'
+            : hoveredButton === 'connector' ? 'rgba(0,0,0,0.08)' : 'transparent',
+          border: connectorMode ? '1px solid #3b82f6' : 'none',
           borderRadius: 8,
           transition: 'background 0.15s',
         }}

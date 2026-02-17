@@ -409,7 +409,7 @@ export default function Board({
         background: '#f0f0f0',
         touchAction: 'none',
         userSelect: 'none',
-        cursor: activeResizeCursor || (draggingId ? 'grabbing' : isPanning ? 'grabbing' : 'grab'),
+        cursor: activeResizeCursor || (draggingId ? 'grabbing' : isPanning ? 'grabbing' : connectorMode ? 'crosshair' : 'default'),
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -519,6 +519,7 @@ export default function Board({
                   onUpdate={handleObjectUpdate}
                   onDragStart={handleObjectDragStart}
                   onResizeStart={onResizeStart}
+                  onEditStateChange={handleEditingStateChange}
                   zoom={zoom}
                   remoteEntryPhase={remoteEntryPhase}
                   interactionMode={connectorMode ? 'connecting' : 'idle'}
@@ -534,6 +535,7 @@ export default function Board({
                   onUpdate={handleObjectUpdate}
                   onDragStart={handleObjectDragStart}
                   onResizeStart={onResizeStart}
+                  onEditStateChange={handleEditingStateChange}
                   zoom={zoom}
                   remoteEntryPhase={remoteEntryPhase}
                   interactionMode={connectorMode ? 'connecting' : 'idle'}
@@ -590,7 +592,7 @@ export default function Board({
             or <strong>R</strong> for a rectangle
           </div>
         )}
-        {selectedObject && (
+        {selectedObject && selectedObject.type !== 'line' && selectedObject.type !== 'connector' && (
           <SelectionOverlay
             object={selectionBounds ?? selectedObject}
             isResizable={selectedObject.type === 'rectangle' || selectedObject.type === 'sticky' || selectedObject.type === 'circle' || selectedObject.type === 'text' || selectedObject.type === 'frame'}
