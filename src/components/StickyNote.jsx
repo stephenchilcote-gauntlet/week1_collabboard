@@ -48,7 +48,7 @@ export default function StickyNote({
   useEffect(() => cleanupPendingDrag, []);
 
   const handleEnterEdit = (event) => {
-    if (lockedByOther) {
+    if (lockedByOther || interactionMode === 'connecting') {
       return;
     }
     event.stopPropagation();

@@ -26,8 +26,9 @@ export default function Connector({ connector, objects, onSelect }) {
         position: 'absolute',
         left: 0,
         top: 0,
-        width: '100%',
-        height: '100%',
+        width: 99999,
+        height: 99999,
+        overflow: 'visible',
         pointerEvents: 'none',
         zIndex: connector.zIndex ?? 0,
       }}
