@@ -19,7 +19,14 @@ export const useCursors = (user) => {
     const userCursorRef = ref(db, `boards/${BOARD_ID}/cursors/${user.uid}`);
 
     const unsubscribe = onValue(cursorsRef, (snapshot) => {
-      setCursors(snapshot.val() ?? {});
+      const next = snapshot.val() ?? {};
+      const sanitized = Object.entries(next).reduce((acc, [uid, entry]) => {
+        if (entry && typeof entry.uid === 'string') {
+          acc[uid] = entry;
+        }
+        return acc;
+      }, {});
+      setCursors(sanitized);
     });
 
     set(userCursorRef, {

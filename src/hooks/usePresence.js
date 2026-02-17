@@ -91,7 +91,9 @@ export const usePresence = (user) => {
     const unsubscribeList = onValue(listRef, (snapshot) => {
       const value = snapshot.val() ?? {};
       const now = Date.now();
-      const list = Object.values(value).filter((entry) => now - entry.lastActiveAt < PRESENCE_TTL_MS);
+      const list = Object.values(value)
+        .filter((entry) => entry && typeof entry.lastActiveAt === 'number')
+        .filter((entry) => now - entry.lastActiveAt < PRESENCE_TTL_MS);
       setPresenceList(list);
     });
 
