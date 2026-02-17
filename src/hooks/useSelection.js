@@ -5,7 +5,6 @@ import { db, BOARD_ID } from '../firebase/config.js';
 export const useSelection = (objects = {}, user = null) => {
   const [selectedId, setSelectedId] = useState(null);
   const [remoteSelections, setRemoteSelections] = useState({});
-  const cleanupRef = useRef(null);
 
   // Compute which objectIds are locked by OTHER users: objectId → { uid, name }
   const lockedObjectIds = useMemo(() => {
@@ -32,15 +31,27 @@ export const useSelection = (objects = {}, user = null) => {
     return () => unsubscribe();
   }, []);
 
+  // Register onDisconnect via .info/connected so it survives reconnections
+  useEffect(() => {
+    if (!user) return undefined;
+    const selectionRef = ref(db, `boards/${BOARD_ID}/selections/${user.uid}`);
+    const connectedRef = ref(db, '.info/connected');
+
+    const unsubscribe = onValue(connectedRef, (snap) => {
+      if (!snap.val()) return;
+      onDisconnect(selectionRef).remove();
+    });
+
+    return () => {
+      unsubscribe();
+      remove(selectionRef);
+    };
+  }, [user]);
+
   // Sync local selection to Firebase
   useEffect(() => {
     if (!user) return undefined;
     const selectionRef = ref(db, `boards/${BOARD_ID}/selections/${user.uid}`);
-
-    if (cleanupRef.current) {
-      cleanupRef.current();
-      cleanupRef.current = null;
-    }
 
     if (selectedId) {
       set(selectionRef, { objectId: selectedId, name: user.displayName ?? 'Anonymous' });
@@ -48,25 +59,8 @@ export const useSelection = (objects = {}, user = null) => {
       remove(selectionRef);
     }
 
-    const disconnectRef = onDisconnect(selectionRef);
-    disconnectRef.remove();
-    cleanupRef.current = () => disconnectRef.cancel();
-
     return undefined;
   }, [selectedId, user]);
-
-  // Clean up on unmount
-  useEffect(() => {
-    if (!user) return undefined;
-    const selectionRef = ref(db, `boards/${BOARD_ID}/selections/${user.uid}`);
-    return () => {
-      remove(selectionRef);
-      if (cleanupRef.current) {
-        cleanupRef.current();
-        cleanupRef.current = null;
-      }
-    };
-  }, [user]);
 
   useEffect(() => {
     if (selectedId && !objects[selectedId]) {

@@ -157,10 +157,16 @@ describe('useSelection', () => {
 
   it('deselects if another user locks the currently selected object', () => {
     const user = { uid: 'me', displayName: 'Me' };
-    let onValueCallback;
+    let selectionsCallback;
     mockOnValue.mockImplementation((_ref, callback) => {
-      onValueCallback = callback;
-      callback({ val: () => ({}) });
+      // The first onValue call is for selections, the rest are .info/connected etc.
+      if (!selectionsCallback) {
+        selectionsCallback = callback;
+        callback({ val: () => ({}) });
+      } else {
+        // .info/connected: fire as connected
+        callback({ val: () => true });
+      }
       return vi.fn();
     });
 
@@ -173,7 +179,7 @@ describe('useSelection', () => {
 
     // Simulate remote user selecting the same object
     act(() => {
-      onValueCallback({
+      selectionsCallback({
         val: () => ({
           other_user: { objectId: 'note-1', name: 'Alice' },
           me: { objectId: 'note-1', name: 'Me' },
@@ -184,10 +190,16 @@ describe('useSelection', () => {
     expect(result.current.selectedId).toBeNull();
   });
 
-  it('sets up onDisconnect cleanup', () => {
+  it('sets up onDisconnect via .info/connected', () => {
     const disconnectRemove = vi.fn();
     mockOnDisconnect.mockReturnValue({ remove: disconnectRemove, cancel: vi.fn() });
     const user = { uid: 'me', displayName: 'Me' };
+
+    // Simulate .info/connected firing true
+    mockOnValue.mockImplementation((_ref, callback) => {
+      callback({ val: () => true });
+      return vi.fn();
+    });
 
     renderHook(() => useSelection({}, user));
 
