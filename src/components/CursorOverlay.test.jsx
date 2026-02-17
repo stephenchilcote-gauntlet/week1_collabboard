@@ -13,4 +13,15 @@ describe('CursorOverlay', () => {
 
     expect(getByText('User 1')).toBeInTheDocument();
   });
+
+  it('renders cursor arrow SVG for each remote cursor', () => {
+    const { container } = render(
+      <CursorOverlay
+        cursors={{ user1: { uid: 'user1', name: 'User 1', x: 10, y: 20 } }}
+        viewport={{ panX: 0, panY: 0, zoom: 1, viewportWidth: 800, viewportHeight: 600 }}
+      />,
+    );
+
+    expect(container.querySelector('svg')).toBeInTheDocument();
+  });
 });

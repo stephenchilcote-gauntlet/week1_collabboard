@@ -430,6 +430,26 @@ export default function Board({
             </div>
           );
         })}
+        {objectsLoaded && sortedObjects.length === 0 && (
+          <div
+            data-testid="empty-board-hint"
+            style={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              color: '#9ca3af',
+              fontSize: 15,
+              textAlign: 'center',
+              pointerEvents: 'none',
+              userSelect: 'none',
+              lineHeight: 1.6,
+            }}
+          >
+            Press <strong>S</strong> to add a sticky note<br />
+            or <strong>R</strong> for a rectangle
+          </div>
+        )}
         {selectedObject && (
           <SelectionOverlay
             object={selectedObject}

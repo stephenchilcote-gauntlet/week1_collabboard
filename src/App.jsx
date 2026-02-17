@@ -62,6 +62,17 @@ const BoardShell = ({ user }) => {
     (resizeId) => interactionState.setMode(resizeId ? 'resizing' : 'idle', resizeId),
   );
 
+  const clearSelection = selection.clearSelection;
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        clearSelection();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [clearSelection]);
+
   const [undoToast, setUndoToast] = useState(null);
   const undoTimerRef = useRef(null);
 
@@ -269,7 +280,26 @@ const BoardShell = ({ user }) => {
         >
           −
         </button>
-        <span style={{ minWidth: 36, textAlign: 'center' }}>{viewport.zoomPercent}%</span>
+        <button
+          onClick={() => viewport.resetZoom()}
+          title="Reset zoom"
+          style={{
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            fontSize: 12,
+            color: '#6b7280',
+            minWidth: 36,
+            textAlign: 'center',
+            padding: '2px 4px',
+            borderRadius: 4,
+            lineHeight: 1,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = '#e5e7eb'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+        >
+          {viewport.zoomPercent}%
+        </button>
         <button
           onClick={() => viewport.handleZoom(-1, viewport.viewportWidth / 2, viewport.viewportHeight / 2)}
           style={{

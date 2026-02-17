@@ -16,6 +16,7 @@ const baseProps = {
     zoomPercent: 100,
     viewportWidth: 800,
     viewportHeight: 600,
+    isPanning: false,
     handlePanStart,
     handlePanMove,
     handlePanEnd,
@@ -173,5 +174,49 @@ describe('Board', () => {
     );
 
     expect(getAllByTestId('resize-handle')).toHaveLength(8);
+  });
+
+  it('shows grab cursor by default', () => {
+    const { getByTestId } = render(<Board {...baseProps} />);
+    const outer = getByTestId('board-outer');
+    expect(outer.style.cursor).toBe('grab');
+  });
+
+  it('shows empty board hint when no objects are loaded', () => {
+    const { getByTestId, queryByTestId, rerender } = render(
+      <Board {...baseProps} objects={{}} objectsLoaded={true} />,
+    );
+
+    expect(getByTestId('empty-board-hint')).toBeInTheDocument();
+
+    rerender(
+      <Board
+        {...baseProps}
+        objectsLoaded={true}
+        objects={{
+          note1: {
+            id: 'note1',
+            type: 'sticky',
+            x: 10,
+            y: 10,
+            width: 200,
+            height: 150,
+            text: 'Hello',
+            color: '#FFD700',
+            zIndex: 1,
+          },
+        }}
+      />,
+    );
+
+    expect(queryByTestId('empty-board-hint')).toBeNull();
+  });
+
+  it('shows grabbing cursor while panning', () => {
+    const { getByTestId } = render(
+      <Board {...baseProps} viewport={{ ...baseProps.viewport, isPanning: true }} />,
+    );
+    const outer = getByTestId('board-outer');
+    expect(outer.style.cursor).toBe('grabbing');
   });
 });

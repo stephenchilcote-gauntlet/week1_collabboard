@@ -4,6 +4,8 @@ import {
   OBJECT_COLORS,
   SELECTION_COLOR,
   ERROR_COLOR,
+  ERROR_BG,
+  ERROR_TEXT,
   WARNING_COLOR,
   DEFAULT_RECTANGLE_COLOR,
   DEFAULT_STICKY_COLOR,
@@ -31,6 +33,12 @@ describe('colors', () => {
 
   it('uses distinct defaults for sticky notes and rectangles', () => {
     expect(DEFAULT_STICKY_COLOR).not.toBe(DEFAULT_RECTANGLE_COLOR);
+  });
+
+  it('error palette colors are distinct from each other', () => {
+    const errorColors = [ERROR_COLOR, ERROR_BG, ERROR_TEXT];
+    const unique = new Set(errorColors);
+    expect(unique.size).toBe(3);
   });
 
   test.prop([fc.string()])('cursor color is deterministic and avoids reserved hues', (uid) => {

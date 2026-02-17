@@ -74,6 +74,11 @@ export const useViewport = (boardRef) => {
     return () => window.removeEventListener('resize', updateSize);
   }, [boardRef]);
 
+  const resetZoom = useCallback(() => {
+    setZoom(1);
+    setPan({ panX: 0, panY: 0 });
+  }, []);
+
   const zoomPercent = useMemo(() => Math.round(zoom * 100), [zoom]);
 
   return {
@@ -87,6 +92,7 @@ export const useViewport = (boardRef) => {
     handlePanMove,
     handlePanEnd,
     handleZoom,
+    resetZoom,
     isPanning,
   };
 };

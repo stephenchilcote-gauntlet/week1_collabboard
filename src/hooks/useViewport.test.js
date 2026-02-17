@@ -67,6 +67,53 @@ describe('useViewport', () => {
     expect(after.y).toBeCloseTo(before.y, 3);
   });
 
+  it('exposes isPanning state', () => {
+    const boardRef = createBoardRef();
+    const { result } = renderHook(() => useViewport(boardRef));
+
+    expect(result.current.isPanning).toBe(false);
+
+    act(() => {
+      result.current.handlePanStart(0, 0, 1);
+    });
+    expect(result.current.isPanning).toBe(true);
+
+    act(() => {
+      result.current.handlePanEnd(1);
+    });
+    expect(result.current.isPanning).toBe(false);
+  });
+
+  it('resetZoom restores default zoom and pan', () => {
+    const boardRef = createBoardRef();
+    const { result } = renderHook(() => useViewport(boardRef));
+
+    act(() => {
+      result.current.handlePanStart(0, 0, 1);
+    });
+    act(() => {
+      result.current.handlePanMove(50, 30);
+    });
+    act(() => {
+      result.current.handlePanEnd(1);
+    });
+    act(() => {
+      result.current.handleZoom(-100, 400, 300);
+    });
+
+    expect(result.current.zoom).not.toBe(1);
+    expect(result.current.panX).not.toBe(0);
+    expect(result.current.panY).not.toBe(0);
+
+    act(() => {
+      result.current.resetZoom();
+    });
+
+    expect(result.current.zoom).toBe(1);
+    expect(result.current.panX).toBe(0);
+    expect(result.current.panY).toBe(0);
+  });
+
   it('tracks viewport dimensions', () => {
     const boardRef = createBoardRef();
     const { result } = renderHook(() => useViewport(boardRef));

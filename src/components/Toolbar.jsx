@@ -13,6 +13,14 @@ export default function Toolbar({
       if (interactionMode === 'editing') {
         return;
       }
+      if (event.key === 's' || event.key === 'S') {
+        onCreateSticky();
+        return;
+      }
+      if (event.key === 'r' || event.key === 'R') {
+        onCreateRectangle();
+        return;
+      }
       if (!selectedId) {
         return;
       }
@@ -23,7 +31,7 @@ export default function Toolbar({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [interactionMode, onDeleteSelected, selectedId]);
+  }, [interactionMode, onCreateSticky, onCreateRectangle, onDeleteSelected, selectedId]);
 
   return (
     <div
@@ -45,7 +53,7 @@ export default function Toolbar({
       <button
         type="button"
         onClick={onCreateSticky}
-        title="Add sticky note"
+        title="Add sticky note (S)"
         onMouseEnter={() => setHoveredButton('sticky')}
         onMouseLeave={() => setHoveredButton(null)}
         style={{
@@ -60,7 +68,7 @@ export default function Toolbar({
       <button
         type="button"
         onClick={onCreateRectangle}
-        title="Add rectangle"
+        title="Add rectangle (R)"
         onMouseEnter={() => setHoveredButton('rectangle')}
         onMouseLeave={() => setHoveredButton(null)}
         style={{
