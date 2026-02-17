@@ -12,8 +12,10 @@ export default function CursorOverlay({ cursors, viewport, currentUid }) {
         pointerEvents: 'none',
       }}
     >
-      {Object.values(cursors).filter((cursor) => cursor.uid !== currentUid).map((cursor) => {
-        const point = boardToScreen(cursor.x, cursor.y, panX, panY, zoom);
+      {Object.values(cursors)
+        .filter((cursor) => cursor?.uid && cursor.uid !== currentUid)
+        .map((cursor) => {
+        const point = boardToScreen(cursor.x ?? 0, cursor.y ?? 0, panX, panY, zoom);
         if (point.x < 0 || point.y < 0 || point.x > viewportWidth || point.y > viewportHeight) {
           return null;
         }
