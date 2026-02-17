@@ -13,6 +13,7 @@ describe('StickyNote', () => {
         onSelect={onSelect}
         onUpdate={onUpdate}
         onDragStart={vi.fn()}
+        onEditStateChange={vi.fn()}
         zoom={1}
       />,
     );

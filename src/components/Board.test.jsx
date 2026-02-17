@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, fireEvent } from '@testing-library/react';
+import { render, fireEvent, waitFor } from '@testing-library/react';
 import Board from './Board.jsx';
 
 const handlePanStart = vi.fn();
@@ -7,8 +7,9 @@ const handlePanMove = vi.fn();
 const handlePanEnd = vi.fn();
 const handleZoom = vi.fn();
 
-vi.mock('../hooks/useViewport.js', () => ({
-  useViewport: vi.fn(() => ({
+const baseProps = {
+  boardRef: { current: { getBoundingClientRect: () => ({ left: 0, top: 0 }), setPointerCapture: vi.fn(), releasePointerCapture: vi.fn() } },
+  viewport: {
     panX: 0,
     panY: 0,
     zoom: 1,
@@ -19,12 +20,24 @@ vi.mock('../hooks/useViewport.js', () => ({
     handlePanMove,
     handlePanEnd,
     handleZoom,
-  })),
-}));
-
-vi.mock('../hooks/useBoardObjects.js', () => ({
-  useBoardObjects: vi.fn(() => ({ objectsLoaded: true })),
-}));
+  },
+  objects: {},
+  objectsLoaded: true,
+  user: { uid: 'user-1', displayName: 'Alex' },
+  localCreatedIds: new Set(),
+  selectedId: null,
+  onSelect: vi.fn(),
+  onClearSelection: vi.fn(),
+  onUpdateObject: vi.fn(),
+  onEditingChange: vi.fn(),
+  onDragStart: vi.fn(),
+  onDragMove: vi.fn(),
+  onDragEnd: vi.fn(),
+  onResizeStart: vi.fn(),
+  onResizeMove: vi.fn(),
+  onResizeEnd: vi.fn(),
+  onCursorMove: vi.fn(),
+};
 
 describe('Board', () => {
   beforeEach(() => {
@@ -32,7 +45,7 @@ describe('Board', () => {
   });
 
   it('renders board structure and dot grid', () => {
-    const { getByTestId } = render(<Board />);
+    const { getByTestId } = render(<Board {...baseProps} />);
     const outer = getByTestId('board-outer');
     const inner = getByTestId('board-inner');
 
@@ -42,11 +55,99 @@ describe('Board', () => {
   });
 
   it('routes pointer down to pan when clicking empty space', () => {
-    const { getByTestId } = render(<Board />);
+    const { getByTestId } = render(<Board {...baseProps} />);
     const outer = getByTestId('board-outer');
 
     fireEvent.pointerDown(outer, { button: 0, clientX: 10, clientY: 20, pointerId: 7 });
 
     expect(handlePanStart).toHaveBeenCalled();
+  });
+
+  it('highlights newly synced remote objects', async () => {
+    const { rerender, getByTestId } = render(<Board {...baseProps} objects={{}} />);
+
+    rerender(
+      <Board
+        {...baseProps}
+        objects={{
+          remote1: {
+            id: 'remote1',
+            type: 'sticky',
+            x: 10,
+            y: 10,
+            width: 200,
+            height: 150,
+            text: 'Hello',
+            color: '#FFD700',
+            zIndex: 1,
+          },
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      const note = getByTestId('sticky-note');
+      expect(note.style.opacity).toBe('0');
+    });
+  });
+
+  it('shows a remote drag name tag when another user moves an object', () => {
+    const { getByTestId } = render(
+      <Board
+        {...baseProps}
+        objects={{
+          remote1: {
+            id: 'remote1',
+            type: 'rectangle',
+            x: 10,
+            y: 10,
+            width: 120,
+            height: 80,
+            color: '#4ECDC4',
+            zIndex: 1,
+            updatedBy: 'other',
+            updatedByName: 'Taylor',
+            updatedAt: Date.now(),
+          },
+        }}
+      />,
+    );
+
+    expect(getByTestId('remote-drag-label')).toBeInTheDocument();
+  });
+
+  it('notifies when remote changes happen off screen', async () => {
+    const { rerender, getByTestId } = render(<Board {...baseProps} objects={{}} />);
+
+    rerender(
+      <Board
+        {...baseProps}
+        objects={{
+          remote1: {
+            id: 'remote1',
+            type: 'sticky',
+            x: 900,
+            y: 900,
+            width: 200,
+            height: 150,
+            text: 'Off screen',
+            color: '#FFD700',
+            zIndex: 1,
+            updatedBy: 'other',
+            updatedByName: 'Jamie',
+            updatedAt: Date.now(),
+          },
+        }}
+        viewport={{
+          ...baseProps.viewport,
+          viewportWidth: 300,
+          viewportHeight: 200,
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(getByTestId('remote-change-toast')).toBeInTheDocument();
+    });
   });
 });

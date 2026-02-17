@@ -91,17 +91,23 @@ export const useBoardObjects = ({ user, draggingId = null, editingId = null } = 
     });
   }, [user]);
 
-  const createStickyNote = useCallback((panX, panY, zoom, viewportWidth, viewportHeight) => {
+  const createStickyNote = useCallback((panX, panY, zoom, viewportWidth, viewportHeight, zIndex) => {
     const position = viewportCenter(panX, panY, zoom, viewportWidth, viewportHeight);
-    const sticky = createSticky(position, user);
+    const sticky = {
+      ...createSticky(position, user),
+      zIndex,
+    };
     localCreatedIds.current.add(sticky.id);
     const objectRef = ref(db, `boards/${BOARD_ID}/objects/${sticky.id}`);
     return set(objectRef, sticky);
   }, [user]);
 
-  const createRectangle = useCallback((panX, panY, zoom, viewportWidth, viewportHeight) => {
+  const createRectangle = useCallback((panX, panY, zoom, viewportWidth, viewportHeight, zIndex) => {
     const position = viewportCenter(panX, panY, zoom, viewportWidth, viewportHeight);
-    const rectangle = createRectangleObject(position, user);
+    const rectangle = {
+      ...createRectangleObject(position, user),
+      zIndex,
+    };
     localCreatedIds.current.add(rectangle.id);
     const objectRef = ref(db, `boards/${BOARD_ID}/objects/${rectangle.id}`);
     return set(objectRef, rectangle);

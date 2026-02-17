@@ -6,11 +6,15 @@ export default function Rectangle({
   onDragStart,
   onResizeStart,
   zoom,
+  remoteEntryPhase,
 }) {
   const handlePointerDown = (event) => {
     onSelect(object.id);
-    onDragStart(object.id, event.clientX, event.clientY);
+    onDragStart(object, event);
   };
+
+  const isEntering = remoteEntryPhase === 'initial';
+  const isHighlighted = remoteEntryPhase === 'active';
 
   return (
     <div
@@ -28,6 +32,9 @@ export default function Rectangle({
         boxSizing: 'border-box',
         zIndex: object.zIndex,
         cursor: isSelected ? 'grabbing' : 'grab',
+        opacity: isEntering ? 0 : 1,
+        transition: 'opacity 300ms ease, box-shadow 300ms ease',
+        boxShadow: isHighlighted ? '0 0 0 3px rgba(59, 130, 246, 0.35)' : 'none',
       }}
     />
   );

@@ -6,7 +6,9 @@ export default function StickyNote({
   onSelect,
   onUpdate,
   onDragStart,
+  onEditStateChange,
   zoom,
+  remoteEntryPhase,
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftText, setDraftText] = useState(object.text ?? '');
@@ -19,8 +21,15 @@ export default function StickyNote({
   useEffect(() => {
     if (isEditing) {
       textRef.current?.focus();
+      onEditStateChange?.(object.id, true);
     }
-  }, [isEditing]);
+  }, [isEditing, object.id, onEditStateChange]);
+
+  useEffect(() => {
+    if (!isEditing) {
+      onEditStateChange?.(object.id, false);
+    }
+  }, [isEditing, object.id, onEditStateChange]);
 
   const handleDoubleClick = (event) => {
     event.stopPropagation();
@@ -32,7 +41,7 @@ export default function StickyNote({
     if (isEditing) {
       return;
     }
-    onDragStart(object.id, event.clientX, event.clientY);
+    onDragStart(object, event);
   };
 
   const handleBlur = () => {
@@ -62,6 +71,8 @@ export default function StickyNote({
   };
 
   const cursor = isEditing ? 'text' : isSelected ? 'grabbing' : 'grab';
+  const isEntering = remoteEntryPhase === 'initial';
+  const isHighlighted = remoteEntryPhase === 'active';
 
   return (
     <div
@@ -84,6 +95,9 @@ export default function StickyNote({
         zIndex: object.zIndex,
         cursor,
         userSelect: isEditing ? 'text' : 'none',
+        opacity: isEntering ? 0 : 1,
+        transition: 'opacity 300ms ease, box-shadow 300ms ease',
+        boxShadow: isHighlighted ? '0 0 0 4px rgba(59, 130, 246, 0.35)' : 'none',
       }}
     >
       {isEditing ? (
