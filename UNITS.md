@@ -1697,6 +1697,100 @@ These invariants span multiple units and cannot be attributed to a single unit. 
 
 ---
 
+## §4f. Frame Containment & Color — `src/components/Frame.jsx`, `src/App.jsx`, `src/utils/coordinates.js`
+
+### User Stories
+- F.1: When I move an object completely inside a Frame, then drag the Frame, all contained objects should move with it.
+- F.2: I should be able to set a Frame's color using the color swatches; the border, background tint, and title bar update to reflect the chosen color.
+
+---
+
+### Unit 4f-A: `src/utils/coordinates.js` — Containment helpers
+
+| Field | Value |
+|-------|-------|
+| **Stories** | F.1 |
+| **Prerequisites** | None |
+| **Exports** | `containsRect(outer, inner)`, `getObjectBounds(obj)` |
+
+#### Unit 4f-A-1: `containsRect(outer, inner)` — Full containment check
+
+| Field | Value |
+|-------|-------|
+| **Input** | Two rect objects `{ x, y, width, height }` |
+| **Output** | `true` if `inner` is fully inside `outer` (inclusive edges) |
+| **Invariant** | `containsRect(r, r) === true` (self-containment). Returns false if inner extends beyond outer on any edge. |
+| **Testing** | Example-based edge cases + PBT: `∀ rect: containsRect(rect, rect) === true`; `∀ (outer, inner) constructed inside: containsRect(outer, inner) === true`. |
+| **Plan** | Compare all four edges: `outer.x ≤ inner.x`, `outer.y ≤ inner.y`, `outer.x+w ≥ inner.x+w`, `outer.y+h ≥ inner.y+h`. |
+
+#### Unit 4f-A-2: `getObjectBounds(obj)` — Normalize object to bounding rect
+
+| Field | Value |
+|-------|-------|
+| **Input** | Board object (rect-like with `x, y, width, height` or line-like with `x1, y1, x2, y2`) |
+| **Output** | `{ x, y, width, height }` bounding rect |
+| **Invariant** | Line-like objects produce a rect from `min(x1,x2)..max(x1,x2)` × `min(y1,y2)..max(y1,y2)`. Rect-like objects pass through. Missing `width`/`height` default to 0. |
+| **Testing** | Example-based: rect-like, line-like (reversed coords), missing dimensions. |
+| **Plan** | Check for `x1`/`y1` presence to detect line-like objects. |
+
+---
+
+### Unit 4f-B: `src/App.jsx` — Frame drag includes contained children
+
+| Field | Value |
+|-------|-------|
+| **Stories** | F.1 |
+| **Prerequisites** | Units 4f-A (containment helpers), 2-B (useDrag), 3-A (useSelection) |
+
+#### Unit 4f-B-1: `handleDragStart` — Collect frame children on drag
+
+| Field | Value |
+|-------|-------|
+| **Input** | Frame object being dragged, all board objects |
+| **Output** | `selectedObjects` array containing the frame + all objects whose bounds are fully inside the frame |
+| **Invariant** | Only objects with `containsRect(frameBounds, objBounds) === true` are included. The frame itself is always in the array. Selection state is updated via `setSelection()` to include all children. Per-item throttles are created so all objects move in sync. |
+| **Constraints** | Does not apply when the user already has a multi-selection (existing multi-drag takes priority). |
+| **Plan** | In `handleDragStart`, when `object.type === 'frame'` and no existing multi-selection, compute frame bounds, filter all objects by `containsRect`, build `selectedObjects`, call `selection.setSelection()`. |
+
+---
+
+### Unit 4f-C: `src/hooks/useDrag.js` — Per-item throttles for multi-drag
+
+| Field | Value |
+|-------|-------|
+| **Stories** | F.1 |
+| **Prerequisites** | Unit 4-C (throttle) |
+
+#### Unit 4f-C-1: `useDrag` — Per-item throttle allocation
+
+| Field | Value |
+|-------|-------|
+| **Input** | `selectedObjects` array passed to `handleDragStart` |
+| **Output** | One independent `throttle()` instance per item stored in `multiUpdateRef.current.throttles` |
+| **Invariant** | Each item's position updates go through its own throttle, preventing the shared throttle's single `pendingArgs` slot from dropping updates. All throttles are flushed on `handleDragEnd`. |
+| **Plan** | Create `throttles = {}` map in `handleDragStart`. In `handleDragMove`, use `throttles[item.id]` instead of shared `throttledUpdate`. In `handleDragEnd`, flush all per-item throttles. |
+
+---
+
+### Unit 4f-D: `src/components/Frame.jsx` — Color support
+
+| Field | Value |
+|-------|-------|
+| **Stories** | F.2 |
+| **Prerequisites** | Unit C-C (ColorPalette) |
+
+#### Unit 4f-D-1: `Frame` — Apply `object.color` to visuals
+
+| Field | Value |
+|-------|-------|
+| **Input** | `object.color` (hex string or undefined) |
+| **Output** | Border uses `object.color`; background uses `${color}22` (≈13% opacity); title bar uses `${color}33` (≈20% opacity) |
+| **Invariant** | When `object.color` is unset, defaults to original dashed grey border and translucent slate fill. When set, all three regions (border, body, title bar) reflect the chosen color with appropriate opacity. Color changes sync via the existing `onUpdate` → Firebase path. |
+| **Testing** | Example-based: default colors when no color set; custom color applied to border, background, and title bar. |
+| **Plan** | Ternary on `object.color` for `border`, `background`, and title bar `background`/`borderBottom` CSS properties. |
+
+---
+
 ## Appendix: Firebase Path Reference
 
 | Path | Unit | Purpose |
