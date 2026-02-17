@@ -91,10 +91,11 @@ describe('Board', () => {
     });
   });
 
-  it('shows a remote drag name tag when another user moves an object', () => {
+  it('shows a selection label when an object is locked by another user', () => {
     const { getByTestId } = render(
       <Board
         {...baseProps}
+        lockedObjectIds={{ remote1: { uid: 'other', name: 'Taylor' } }}
         objects={{
           remote1: {
             id: 'remote1',
@@ -105,15 +106,14 @@ describe('Board', () => {
             height: 80,
             color: '#4ECDC4',
             zIndex: 1,
-            updatedBy: 'other',
-            updatedByName: 'Taylor',
-            updatedAt: Date.now(),
           },
         }}
       />,
     );
 
-    expect(getByTestId('remote-drag-label')).toBeInTheDocument();
+    const label = getByTestId('remote-selection-label');
+    expect(label).toBeInTheDocument();
+    expect(label.textContent).toBe('Taylor');
   });
 
   it('notifies when remote changes happen off screen', async () => {

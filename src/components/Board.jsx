@@ -5,7 +5,6 @@ import SelectionOverlay from './SelectionOverlay.jsx';
 import { boardToScreen } from '../utils/coordinates.js';
 
 const REMOTE_ENTRY_DURATION_MS = 350;
-const REMOTE_DRAG_WINDOW_MS = 1000;
 const OFFSCREEN_TOAST_DURATION_MS = 3000;
 const RESIZE_CURSORS = {
   nw: 'nwse-resize',
@@ -64,7 +63,6 @@ export default function Board({
   const notificationInitializedRef = useRef(false);
   const prevNotificationObjectsRef = useRef({});
   const lastNotificationRef = useRef({});
-  const [timeNow, setTimeNow] = useState(() => Date.now());
   const pointerCaptureRef = useRef(null);
   const [activeResizeCursor, setActiveResizeCursor] = useState('');
 
@@ -120,13 +118,6 @@ export default function Board({
       notificationTimeoutsRef.current.delete(id);
     }, OFFSCREEN_TOAST_DURATION_MS);
     notificationTimeoutsRef.current.set(id, timeout);
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTimeNow(Date.now());
-    }, 250);
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => () => {
@@ -386,13 +377,6 @@ export default function Board({
           const remoteEntryPhase = remoteEntryPhases[object.id];
           const lockEntry = lockedObjectIds?.[object.id];
           const lockedByOther = Boolean(lockEntry);
-          const isRemoteDragActive = Boolean(
-            user
-            && object.updatedBy
-            && object.updatedBy !== user.uid
-            && object.updatedAt
-            && timeNow - object.updatedAt < REMOTE_DRAG_WINDOW_MS,
-          );
           return (
             <div key={object.id}>
               {object.type === 'sticky' ? (
@@ -419,25 +403,6 @@ export default function Board({
                   zoom={zoom}
                   remoteEntryPhase={remoteEntryPhase}
                 />
-              )}
-              {isRemoteDragActive && (
-                <div
-                  data-testid="remote-drag-label"
-                  style={{
-                    position: 'absolute',
-                    left: object.x + (object.width ?? 0) + 8,
-                    top: object.y - 18,
-                    padding: '2px 6px',
-                    fontSize: 11,
-                    background: '#111827',
-                    color: '#f9fafb',
-                    borderRadius: 6,
-                    whiteSpace: 'nowrap',
-                    zIndex: (object.zIndex ?? 0) + 2,
-                  }}
-                >
-                  {object.updatedByName ?? 'Anonymous'}
-                </div>
               )}
               {lockedByOther && (
                 <div
