@@ -30,7 +30,14 @@ export const useSelection = (objects = {}, user = null, presenceList = []) => {
   useEffect(() => {
     const selectionsRef = ref(db, `boards/${BOARD_ID}/selections`);
     const unsubscribe = onValue(selectionsRef, (snapshot) => {
-      setRemoteSelections(snapshot.val() ?? {});
+      const next = snapshot.val() ?? {};
+      const sanitized = Object.entries(next).reduce((acc, [uid, entry]) => {
+        if (entry && typeof entry.objectId === 'string') {
+          acc[uid] = entry;
+        }
+        return acc;
+      }, {});
+      setRemoteSelections(sanitized);
     });
     return () => unsubscribe();
   }, []);
@@ -165,7 +172,17 @@ export const useSelection = (objects = {}, user = null, presenceList = []) => {
     if (!Number.isFinite(minX)) {
       return null;
     }
-    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    const bounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    if (selectedIds.size === 1) {
+      const obj = objects[selectedIds.values().next().value];
+      if (obj?.rotation) {
+        bounds.rotation = obj.rotation;
+      }
+      if (obj?.zIndex != null) {
+        bounds.zIndex = obj.zIndex;
+      }
+    }
+    return bounds;
   }, [objects, selectedIds]);
 
   const getIntersectingIds = useCallback((objectsList, marqueeBounds) => {

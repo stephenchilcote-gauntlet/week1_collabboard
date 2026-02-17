@@ -27,6 +27,23 @@ describe('SelectionOverlay', () => {
     expect(overlay.style.zIndex).toBe('8');
   });
 
+  it('applies rotation transform when object has rotation', () => {
+    const { getByTestId } = render(
+      <SelectionOverlay object={{ x: 0, y: 0, width: 100, height: 80, rotation: 45 }} isResizable zoom={1} />,
+    );
+    const overlay = getByTestId('selection-border');
+    expect(overlay.style.transform).toBe('rotate(45deg)');
+    expect(overlay.style.transformOrigin).toBe('center');
+  });
+
+  it('does not apply rotation transform when object has no rotation', () => {
+    const { getByTestId } = render(
+      <SelectionOverlay object={{ x: 0, y: 0, width: 100, height: 80 }} isResizable zoom={1} />,
+    );
+    const overlay = getByTestId('selection-border');
+    expect(overlay.style.transform).toBe('');
+  });
+
   it('renders rotation handle when enabled', () => {
     const { getByTestId } = render(
       <SelectionOverlay object={{ x: 0, y: 0, width: 100, height: 80 }} isResizable zoom={1} showRotation />,

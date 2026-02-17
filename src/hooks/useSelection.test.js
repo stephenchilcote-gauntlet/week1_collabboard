@@ -287,6 +287,48 @@ describe('useSelection', () => {
     expect(disconnectRemove).toHaveBeenCalled();
   });
 
+  it('getSelectionBounds includes rotation for single selected object', () => {
+    const objects = { r1: { id: 'r1', x: 10, y: 20, width: 100, height: 50, rotation: 30 } };
+    const { result } = renderHook(() => useSelection(objects));
+
+    act(() => {
+      result.current.select('r1');
+    });
+
+    const bounds = result.current.getSelectionBounds();
+    expect(bounds).toEqual({ x: 10, y: 20, width: 100, height: 50, rotation: 30 });
+  });
+
+  it('getSelectionBounds includes zIndex for single selected object', () => {
+    const objects = { r1: { id: 'r1', x: 0, y: 0, width: 50, height: 50, zIndex: 5 } };
+    const { result } = renderHook(() => useSelection(objects));
+
+    act(() => {
+      result.current.select('r1');
+    });
+
+    const bounds = result.current.getSelectionBounds();
+    expect(bounds.zIndex).toBe(5);
+  });
+
+  it('getSelectionBounds omits rotation for multi-selection', () => {
+    const objects = {
+      a: { id: 'a', x: 0, y: 0, width: 50, height: 50, rotation: 45 },
+      b: { id: 'b', x: 100, y: 100, width: 50, height: 50, rotation: 90 },
+    };
+    const { result } = renderHook(() => useSelection(objects));
+
+    act(() => {
+      result.current.select('a');
+    });
+    act(() => {
+      result.current.toggleSelection('b');
+    });
+
+    const bounds = result.current.getSelectionBounds();
+    expect(bounds.rotation).toBeUndefined();
+  });
+
   it('setSelection filters out locked object ids', () => {
     const user = { uid: 'me', displayName: 'Me' };
     const presenceList = [{ uid: 'me', name: 'Me' }, { uid: 'other_user', name: 'Alex' }];

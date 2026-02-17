@@ -67,6 +67,8 @@ export default function SelectionOverlay({ object, isResizable, zoom, showRotati
         zIndex: (object.zIndex ?? 0) + 1,
         pointerEvents: 'none',
         boxSizing: 'border-box',
+        transform: object.rotation ? `rotate(${object.rotation}deg)` : undefined,
+        transformOrigin: 'center',
       }}
       data-testid="selection-border"
     >
