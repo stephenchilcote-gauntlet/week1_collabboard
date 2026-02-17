@@ -26,6 +26,7 @@ export default function Line({
   remoteEntryPhase,
   interactionMode,
 }) {
+  const [isHovered, setIsHovered] = useState(false);
   const [draggingEndpoint, setDraggingEndpoint] = useState(null);
   const startPointer = useRef({ x: 0, y: 0 });
   const startPoints = useRef({ x1: 0, y1: 0, x2: 0, y2: 0 });
@@ -95,7 +96,7 @@ export default function Line({
 
   const isEntering = remoteEntryPhase === 'initial';
   const isHighlighted = remoteEntryPhase === 'active';
-  const cursor = lockedByOther ? 'not-allowed' : isDragging ? 'grabbing' : 'grab';
+  const cursor = lockedByOther ? 'not-allowed' : interactionMode === 'connecting' ? 'crosshair' : isDragging ? 'grabbing' : 'grab';
   const opacity = isEntering ? 0 : lockedByOther ? 0.5 : 1;
 
   return (
@@ -110,14 +111,31 @@ export default function Line({
         zIndex: object.zIndex,
       }}
       data-object-id={object.id}
+      data-line-wrapper
     >
       <svg
         data-testid="line-shape"
         data-object-id={object.id}
+        data-line-wrapper
         width="100%"
         height="100%"
         style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible', pointerEvents: 'none' }}
       >
+        <line
+          x1={object.x1}
+          y1={object.y1}
+          x2={object.x2}
+          y2={object.y2}
+          stroke="transparent"
+          strokeWidth={Math.max(object.strokeWidth ?? 2, 14)}
+          style={{
+            pointerEvents: 'auto',
+            cursor,
+          }}
+          onPointerDown={handleBodyPointerDown}
+          onPointerEnter={() => setIsHovered(true)}
+          onPointerLeave={() => setIsHovered(false)}
+        />
         <line
           data-testid="line-body"
           x1={object.x1}
@@ -128,14 +146,23 @@ export default function Line({
           strokeWidth={object.strokeWidth ?? 2}
           opacity={opacity}
           style={{
-            pointerEvents: 'auto',
-            cursor,
+            pointerEvents: 'none',
             transition: 'opacity 300ms ease, filter 300ms ease',
             filter: lockedByOther ? 'grayscale(60%)' : 'none',
             strokeLinecap: 'round',
           }}
-          onPointerDown={handleBodyPointerDown}
         />
+        {isHovered && !lockedByOther && !isHighlighted && (
+          <line
+            x1={object.x1}
+            y1={object.y1}
+            x2={object.x2}
+            y2={object.y2}
+            stroke="rgba(59, 130, 246, 0.25)"
+            strokeWidth={(object.strokeWidth ?? 2) + 6}
+            style={{ pointerEvents: 'none' }}
+          />
+        )}
         {isHighlighted && (
           <line
             x1={object.x1}

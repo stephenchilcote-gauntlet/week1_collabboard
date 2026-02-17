@@ -9,12 +9,14 @@ export default function TextElement({
   onUpdate,
   onDragStart,
   onResizeStart,
+  onEditStateChange,
   zoom,
   remoteEntryPhase,
   interactionMode,
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftText, setDraftText] = useState(object.text ?? '');
+  const [isHovered, setIsHovered] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -23,11 +25,16 @@ export default function TextElement({
     }
   }, [object.text, isEditing]);
 
+  const prevEditingRef = useRef(false);
   useEffect(() => {
     if (isEditing) {
       inputRef.current?.focus();
     }
-  }, [isEditing]);
+    if (isEditing !== prevEditingRef.current) {
+      prevEditingRef.current = isEditing;
+      onEditStateChange?.(object.id, isEditing);
+    }
+  }, [isEditing, object.id, onEditStateChange]);
 
   const handlePointerDown = (event) => {
     if (lockedByOther) {
@@ -62,13 +69,15 @@ export default function TextElement({
 
   const isEntering = remoteEntryPhase === 'initial';
   const isHighlighted = remoteEntryPhase === 'active';
-  const cursor = lockedByOther ? 'not-allowed' : isEditing ? 'text' : isDragging ? 'grabbing' : 'grab';
+  const cursor = lockedByOther ? 'not-allowed' : interactionMode === 'connecting' ? 'crosshair' : isEditing ? 'text' : isDragging ? 'grabbing' : 'grab';
 
   return (
     <div
       data-testid="text-element"
       data-object-id={object.id}
       onPointerDown={handlePointerDown}
+      onPointerEnter={() => setIsHovered(true)}
+      onPointerLeave={() => setIsHovered(false)}
       onDoubleClick={handleDoubleClick}
       style={{
         position: 'absolute',
@@ -82,7 +91,7 @@ export default function TextElement({
         opacity: isEntering ? 0 : lockedByOther ? 0.5 : 1,
         filter: lockedByOther ? 'grayscale(60%)' : 'none',
         transition: 'opacity 300ms ease, box-shadow 300ms ease, filter 300ms ease',
-        boxShadow: isHighlighted ? '0 0 0 3px rgba(59, 130, 246, 0.35)' : 'none',
+        boxShadow: isHighlighted ? '0 0 0 3px rgba(59, 130, 246, 0.35)' : isHovered && !lockedByOther ? '0 0 0 2px rgba(59, 130, 246, 0.25)' : 'none',
         transform: object.rotation ? `rotate(${object.rotation}deg)` : undefined,
         transformOrigin: 'center',
       }}

@@ -16,6 +16,7 @@ export default function StickyNote({
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftText, setDraftText] = useState(object.text ?? '');
+  const [isHovered, setIsHovered] = useState(false);
   const textRef = useRef(null);
   const pendingDragRef = useRef(null);
 
@@ -122,7 +123,7 @@ export default function StickyNote({
     event.stopPropagation();
   };
 
-  const cursor = lockedByOther ? 'not-allowed' : isEditing ? 'text' : isDragging ? 'grabbing' : 'grab';
+  const cursor = lockedByOther ? 'not-allowed' : interactionMode === 'connecting' ? 'crosshair' : isEditing ? 'text' : isDragging ? 'grabbing' : 'grab';
   const isEntering = remoteEntryPhase === 'initial';
   const isHighlighted = remoteEntryPhase === 'active';
 
@@ -131,6 +132,8 @@ export default function StickyNote({
       data-testid="sticky-note"
       data-object-id={object.id}
       onPointerDown={handlePointerDown}
+      onPointerEnter={() => setIsHovered(true)}
+      onPointerLeave={() => setIsHovered(false)}
       onDoubleClick={handleEnterEdit}
       onClick={handleEnterEdit}
       style={{
@@ -151,7 +154,7 @@ export default function StickyNote({
         opacity: isEntering ? 0 : lockedByOther ? 0.5 : 1,
         filter: lockedByOther ? 'grayscale(60%)' : 'none',
         transition: 'opacity 300ms ease, box-shadow 300ms ease, filter 300ms ease',
-        boxShadow: isHighlighted ? '0 0 0 4px rgba(59, 130, 246, 0.35)' : 'none',
+        boxShadow: isHighlighted ? '0 0 0 4px rgba(59, 130, 246, 0.35)' : isHovered && !lockedByOther ? '0 0 0 2px rgba(59, 130, 246, 0.25)' : 'none',
         overflow: 'hidden',
         transform: object.rotation ? `rotate(${object.rotation}deg)` : undefined,
         transformOrigin: 'center',

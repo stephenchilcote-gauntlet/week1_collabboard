@@ -1,9 +1,12 @@
+import { useState } from 'react';
+
 const getCenter = (object) => ({
   x: object.x + (object.width ?? 0) / 2,
   y: object.y + (object.height ?? 0) / 2,
 });
 
 export default function Connector({ connector, objects, onSelect }) {
+  const [isHovered, setIsHovered] = useState(false);
   const source = objects?.[connector.fromId];
   const target = objects?.[connector.toId];
 
@@ -55,6 +58,17 @@ export default function Connector({ connector, objects, onSelect }) {
         markerEnd={hasArrow ? `url(#arrow-${connector.id})` : undefined}
         style={{ pointerEvents: 'none' }}
       />
+      {isHovered && (
+        <line
+          x1={start.x}
+          y1={start.y}
+          x2={end.x}
+          y2={end.y}
+          stroke="rgba(59, 130, 246, 0.25)"
+          strokeWidth={(connector.strokeWidth ?? 2) + 6}
+          style={{ pointerEvents: 'none' }}
+        />
+      )}
       <line
         data-testid="connector-hitbox"
         x1={start.x}
@@ -64,6 +78,8 @@ export default function Connector({ connector, objects, onSelect }) {
         stroke="transparent"
         strokeWidth={14}
         onPointerDown={() => onSelect?.(connector.id)}
+        onPointerEnter={() => setIsHovered(true)}
+        onPointerLeave={() => setIsHovered(false)}
         style={{ pointerEvents: 'auto', cursor: 'pointer' }}
       />
     </svg>

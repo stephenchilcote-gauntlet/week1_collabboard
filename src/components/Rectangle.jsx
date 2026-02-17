@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 export default function Rectangle({
   object,
   isSelected,
@@ -11,6 +13,8 @@ export default function Rectangle({
   remoteEntryPhase,
   interactionMode,
 }) {
+  const [isHovered, setIsHovered] = useState(false);
+
   const handlePointerDown = (event) => {
     if (lockedByOther) {
       return;
@@ -24,13 +28,15 @@ export default function Rectangle({
 
   const isEntering = remoteEntryPhase === 'initial';
   const isHighlighted = remoteEntryPhase === 'active';
-  const cursor = lockedByOther ? 'not-allowed' : isDragging ? 'grabbing' : 'grab';
+  const cursor = lockedByOther ? 'not-allowed' : interactionMode === 'connecting' ? 'crosshair' : isDragging ? 'grabbing' : 'grab';
 
   return (
     <div
       data-testid="rectangle"
       data-object-id={object.id}
       onPointerDown={handlePointerDown}
+      onPointerEnter={() => setIsHovered(true)}
+      onPointerLeave={() => setIsHovered(false)}
       style={{
         position: 'absolute',
         left: object.x,
@@ -45,7 +51,7 @@ export default function Rectangle({
         opacity: isEntering ? 0 : lockedByOther ? 0.5 : 1,
         filter: lockedByOther ? 'grayscale(60%)' : 'none',
         transition: 'opacity 300ms ease, box-shadow 300ms ease, filter 300ms ease',
-        boxShadow: isHighlighted ? '0 0 0 3px rgba(59, 130, 246, 0.35)' : 'none',
+        boxShadow: isHighlighted ? '0 0 0 3px rgba(59, 130, 246, 0.35)' : isHovered && !lockedByOther ? '0 0 0 2px rgba(59, 130, 246, 0.25)' : 'none',
         transform: object.rotation ? `rotate(${object.rotation}deg)` : undefined,
         transformOrigin: 'center',
       }}

@@ -9,7 +9,7 @@
       html, body { width: 100%; height: 100%; overflow: hidden; overscroll-behavior: none; }
       body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
       #root { width: 100%; height: 100%; }
-      [data-object-id]:hover {
+      [data-object-id]:hover:not([data-line-wrapper]) {
         box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
       }
       [data-resize-handle]:hover {

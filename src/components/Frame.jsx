@@ -9,13 +9,16 @@ export default function Frame({
   onUpdate,
   onDragStart,
   onResizeStart,
+  onEditStateChange,
   zoom,
   remoteEntryPhase,
   interactionMode,
 }) {
+  const [isHovered, setIsHovered] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState(object.title ?? '');
   const inputRef = useRef(null);
+  const prevEditingRef = useRef(false);
 
   useEffect(() => {
     if (!isEditing) {
@@ -27,7 +30,11 @@ export default function Frame({
     if (isEditing) {
       inputRef.current?.focus();
     }
-  }, [isEditing]);
+    if (isEditing !== prevEditingRef.current) {
+      prevEditingRef.current = isEditing;
+      onEditStateChange?.(object.id, isEditing);
+    }
+  }, [isEditing, object.id, onEditStateChange]);
 
   const handlePointerDown = (event) => {
     if (lockedByOther) {
@@ -62,48 +69,83 @@ export default function Frame({
 
   const isEntering = remoteEntryPhase === 'initial';
   const isHighlighted = remoteEntryPhase === 'active';
-  const cursor = lockedByOther ? 'not-allowed' : isDragging ? 'grabbing' : 'grab';
+  const cursor = lockedByOther ? 'not-allowed' : interactionMode === 'connecting' ? 'crosshair' : isDragging ? 'grabbing' : 'grab';
 
   return (
     <div
       data-testid="frame"
       data-object-id={object.id}
-      onPointerDown={handlePointerDown}
+      onPointerEnter={() => setIsHovered(true)}
+      onPointerLeave={() => setIsHovered(false)}
       style={{
         position: 'absolute',
         left: object.x,
         top: object.y,
         width: object.width,
         height: object.height,
-        border: '2px dashed rgba(15, 23, 42, 0.35)',
-        borderRadius: 12,
-        background: 'rgba(148, 163, 184, 0.15)',
         zIndex: object.zIndex,
-        cursor,
         boxSizing: 'border-box',
         opacity: isEntering ? 0 : lockedByOther ? 0.5 : 1,
         filter: lockedByOther ? 'grayscale(60%)' : 'none',
         transition: 'opacity 300ms ease, box-shadow 300ms ease, filter 300ms ease',
-        boxShadow: isHighlighted ? '0 0 0 3px rgba(59, 130, 246, 0.35)' : 'none',
         transform: object.rotation ? `rotate(${object.rotation}deg)` : undefined,
         transformOrigin: 'center',
+        pointerEvents: 'none',
       }}
     >
+      {/* Background fill - click-through so children are interactive */}
       <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: 12,
+          background: object.color ? `${object.color}22` : 'rgba(148, 163, 184, 0.15)',
+        }}
+      />
+      {/* Border edges - captures pointer events for selecting/dragging the frame */}
+      {['top', 'bottom', 'left', 'right'].map((side) => (
+        <div
+          key={side}
+          onPointerDown={handlePointerDown}
+          style={{
+            position: 'absolute',
+            cursor,
+            pointerEvents: 'auto',
+            ...(side === 'top' && { top: 0, left: 0, right: 0, height: 6 }),
+            ...(side === 'bottom' && { bottom: 0, left: 0, right: 0, height: 6 }),
+            ...(side === 'left' && { top: 0, bottom: 0, left: 0, width: 6 }),
+            ...(side === 'right' && { top: 0, bottom: 0, right: 0, width: 6 }),
+          }}
+        />
+      ))}
+      {/* Dashed border outline */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          border: `2px dashed ${object.color ? object.color : 'rgba(15, 23, 42, 0.35)'}`,
+          borderRadius: 12,
+          boxShadow: isHighlighted ? '0 0 0 3px rgba(59, 130, 246, 0.35)' : isHovered && !lockedByOther ? '0 0 0 2px rgba(59, 130, 246, 0.25)' : 'none',
+          pointerEvents: 'none',
+        }}
+      />
+      <div
+        onPointerDown={handlePointerDown}
         style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
           padding: '6px 10px',
-          background: 'rgba(15, 23, 42, 0.08)',
-          borderBottom: '1px dashed rgba(15, 23, 42, 0.25)',
+          background: object.color ? `${object.color}33` : 'rgba(15, 23, 42, 0.08)',
+          borderBottom: `1px dashed ${object.color ? object.color : 'rgba(15, 23, 42, 0.25)'}`,
           borderTopLeftRadius: 10,
           borderTopRightRadius: 10,
           fontSize: 13,
           fontWeight: 600,
           color: '#0f172a',
           cursor: isEditing ? 'text' : cursor,
+          pointerEvents: 'auto',
         }}
         data-testid="frame-title"
         onDoubleClick={handleTitleDoubleClick}
