@@ -80,6 +80,7 @@ export default function StickyNote({
       data-object-id={object.id}
       onPointerDown={handlePointerDown}
       onDoubleClick={handleDoubleClick}
+      onClick={handleDoubleClick}
       style={{
         position: 'absolute',
         left: object.x,

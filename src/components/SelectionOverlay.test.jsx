@@ -18,4 +18,12 @@ describe('SelectionOverlay', () => {
     expect(handles).toHaveLength(8);
     expect(handles[0].style.width).toBe('4px');
   });
+
+  it('positions overlay above the object z-index', () => {
+    const { getByTestId } = render(
+      <SelectionOverlay object={{ x: 0, y: 0, width: 100, height: 80, zIndex: 7 }} isResizable zoom={1} />,
+    );
+    const overlay = getByTestId('selection-border');
+    expect(overlay.style.zIndex).toBe('8');
+  });
 });

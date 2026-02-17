@@ -150,4 +150,28 @@ describe('Board', () => {
       expect(getByTestId('remote-change-toast')).toBeInTheDocument();
     });
   });
+
+  it('renders selection overlay with resize handles for sticky notes', () => {
+    const { getAllByTestId } = render(
+      <Board
+        {...baseProps}
+        selectedId="note1"
+        objects={{
+          note1: {
+            id: 'note1',
+            type: 'sticky',
+            x: 10,
+            y: 10,
+            width: 200,
+            height: 150,
+            text: 'Hello',
+            color: '#FFD700',
+            zIndex: 1,
+          },
+        }}
+      />,
+    );
+
+    expect(getAllByTestId('resize-handle')).toHaveLength(8);
+  });
 });

@@ -21,6 +21,7 @@ describe('StickyNote', () => {
     const note = getByTestId('sticky-note');
     expect(note.getAttribute('data-object-id')).toBe('note1');
     expect(note.style.width).toBe('200px');
+    expect(note.style.height).toBe('150px');
 
     fireEvent.doubleClick(note);
     const textarea = getByTestId('sticky-editor');
@@ -28,5 +29,23 @@ describe('StickyNote', () => {
     fireEvent.blur(textarea);
 
     expect(onUpdate).toHaveBeenCalledWith('note1', { text: 'Updated' });
+  });
+
+  it('enters edit mode on click', () => {
+    const { getByTestId } = render(
+      <StickyNote
+        object={{ id: 'note1', x: 0, y: 0, width: 200, height: 150, text: 'Hello', color: '#FFD700', zIndex: 1 }}
+        isSelected
+        onSelect={vi.fn()}
+        onUpdate={vi.fn()}
+        onDragStart={vi.fn()}
+        onEditStateChange={vi.fn()}
+        zoom={1}
+      />,
+    );
+
+    const note = getByTestId('sticky-note');
+    fireEvent.click(note);
+    expect(getByTestId('sticky-editor')).toBeInTheDocument();
   });
 });
