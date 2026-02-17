@@ -2,21 +2,24 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { onDisconnect, onValue, ref, remove, set } from 'firebase/database';
 import { db, BOARD_ID } from '../firebase/config.js';
 
-export const useSelection = (objects = {}, user = null) => {
+export const useSelection = (objects = {}, user = null, presenceList = []) => {
   const [selectedId, setSelectedId] = useState(null);
   const [remoteSelections, setRemoteSelections] = useState({});
 
+  const presentUids = useMemo(() => new Set(presenceList.map((p) => p.uid)), [presenceList]);
+
   // Compute which objectIds are locked by OTHER users: objectId → { uid, name }
+  // Only consider users who are still present (heartbeat-verified)
   const lockedObjectIds = useMemo(() => {
     const locked = {};
     if (!user) return locked;
     for (const [uid, entry] of Object.entries(remoteSelections)) {
-      if (uid !== user.uid && entry.objectId) {
+      if (uid !== user.uid && entry.objectId && presentUids.has(uid)) {
         locked[entry.objectId] = { uid, name: entry.name ?? 'Anonymous' };
       }
     }
     return locked;
-  }, [remoteSelections, user]);
+  }, [remoteSelections, user, presentUids]);
 
   // Keep a ref so select() always sees the latest locked set
   const lockedRef = useRef(lockedObjectIds);

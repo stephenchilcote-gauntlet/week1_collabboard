@@ -37,7 +37,9 @@ const BoardShell = ({ user }) => {
     draggingId: interactionState.mode === 'dragging' ? interactionState.activeObjectId : null,
     editingId: interactionState.mode === 'editing' ? interactionState.activeObjectId : null,
   });
-  const selection = useSelection(objects, user);
+  const { cursors, updateCursor } = useCursors(user);
+  const { presenceList } = usePresence(user);
+  const selection = useSelection(objects, user, presenceList);
   const {
     handleDragStart: dragStart,
     handleDragMove,
@@ -57,8 +59,6 @@ const BoardShell = ({ user }) => {
     updateObject,
     (resizeId) => interactionState.setMode(resizeId ? 'resizing' : 'idle', resizeId),
   );
-  const { cursors, updateCursor } = useCursors(user);
-  const { presenceList } = usePresence(user);
 
   const sortedZIndex = useMemo(() => {
     return Object.values(objects ?? {}).reduce((max, object) => (
