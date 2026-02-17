@@ -87,5 +87,6 @@ export const useViewport = (boardRef) => {
     handlePanMove,
     handlePanEnd,
     handleZoom,
+    isPanning,
   };
 };

@@ -92,6 +92,11 @@ export const useBoardObjects = ({ user, draggingId = null, editingId = null } = 
     return remove(objectRef);
   }, []);
 
+  const restoreObject = useCallback((objectId, objectData) => {
+    const objectRef = ref(db, `boards/${BOARD_ID}/objects/${objectId}`);
+    return set(objectRef, objectData);
+  }, []);
+
   const value = useMemo(() => ({
     objects,
     objectsLoaded,
@@ -99,8 +104,9 @@ export const useBoardObjects = ({ user, draggingId = null, editingId = null } = 
     createStickyNote,
     createRectangle,
     deleteObject,
+    restoreObject,
     localCreatedIds: localCreatedIds.current,
-  }), [objects, objectsLoaded, updateObject, createStickyNote, createRectangle, deleteObject]);
+  }), [objects, objectsLoaded, updateObject, createStickyNote, createRectangle, deleteObject, restoreObject]);
 
   return value;
 };

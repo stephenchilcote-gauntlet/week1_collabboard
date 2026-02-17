@@ -53,6 +53,7 @@ export default function Board({
     handlePanMove,
     handlePanEnd,
     handleZoom,
+    isPanning,
   } = viewport;
   const [remoteEntryPhases, setRemoteEntryPhases] = useState({});
   const entryTimeoutsRef = useRef(new Map());
@@ -339,7 +340,7 @@ export default function Board({
         background: '#f0f0f0',
         touchAction: 'none',
         userSelect: 'none',
-        cursor: activeResizeCursor || undefined,
+        cursor: activeResizeCursor || (isPanning ? 'grabbing' : 'grab'),
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}

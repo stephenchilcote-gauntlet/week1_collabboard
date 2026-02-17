@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function Toolbar({
   onCreateSticky,
@@ -7,6 +7,7 @@ export default function Toolbar({
   selectedId,
   interactionMode,
 }) {
+  const [hoveredButton, setHoveredButton] = useState(null);
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (interactionMode === 'editing') {
@@ -41,10 +42,34 @@ export default function Toolbar({
         zIndex: 160,
       }}
     >
-      <button type="button" onClick={onCreateSticky} style={{ cursor: 'pointer' }}>
+      <button
+        type="button"
+        onClick={onCreateSticky}
+        title="Add sticky note"
+        onMouseEnter={() => setHoveredButton('sticky')}
+        onMouseLeave={() => setHoveredButton(null)}
+        style={{
+          cursor: 'pointer',
+          background: hoveredButton === 'sticky' ? 'rgba(0,0,0,0.08)' : 'transparent',
+          borderRadius: 8,
+          transition: 'background 0.15s',
+        }}
+      >
         Sticky Note
       </button>
-      <button type="button" onClick={onCreateRectangle} style={{ cursor: 'pointer' }}>
+      <button
+        type="button"
+        onClick={onCreateRectangle}
+        title="Add rectangle"
+        onMouseEnter={() => setHoveredButton('rectangle')}
+        onMouseLeave={() => setHoveredButton(null)}
+        style={{
+          cursor: 'pointer',
+          background: hoveredButton === 'rectangle' ? 'rgba(0,0,0,0.08)' : 'transparent',
+          borderRadius: 8,
+          transition: 'background 0.15s',
+        }}
+      >
         Rectangle
       </button>
     </div>

@@ -1,6 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { ERROR_COLOR, ERROR_BG, ERROR_TEXT } from '../utils/colors.js';
 
 export default function ErrorBanner({ message, onDismiss }) {
+  const [hovered, setHovered] = useState(false);
   useEffect(() => {
     const timer = setTimeout(onDismiss, 5000);
     return () => clearTimeout(timer);
@@ -13,9 +15,9 @@ export default function ErrorBanner({ message, onDismiss }) {
         top: 48,
         left: '50%',
         transform: 'translateX(-50%)',
-        background: '#fee2e2',
-        border: '1px solid #ef4444',
-        color: '#991b1b',
+        background: ERROR_BG,
+        border: `1px solid ${ERROR_COLOR}`,
+        color: ERROR_TEXT,
         padding: '10px 16px',
         borderRadius: 12,
         display: 'flex',
@@ -26,7 +28,19 @@ export default function ErrorBanner({ message, onDismiss }) {
     >
       <span aria-hidden="true">✕</span>
       <span>{message}</span>
-      <button type="button" onClick={onDismiss} style={{ marginLeft: 12, cursor: 'pointer' }}>
+      <button
+        type="button"
+        onClick={onDismiss}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          marginLeft: 12,
+          cursor: 'pointer',
+          background: hovered ? 'rgba(0,0,0,0.08)' : 'transparent',
+          borderRadius: 8,
+          transition: 'background 0.15s',
+        }}
+      >
         Dismiss
       </button>
     </div>

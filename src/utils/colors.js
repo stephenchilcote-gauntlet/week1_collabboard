@@ -1,5 +1,7 @@
 export const SELECTION_COLOR = '#2196F3';
-export const ERROR_COLOR = '#FF0000';
+export const ERROR_COLOR = '#ef4444';
+export const ERROR_BG = '#fee2e2';
+export const ERROR_TEXT = '#991b1b';
 export const WARNING_COLOR = '#F59E0B';
 export const OBJECT_COLORS = [
   '#FFD700',
