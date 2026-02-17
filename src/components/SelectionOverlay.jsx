@@ -13,6 +13,16 @@ const HANDLE_POSITIONS = [
 
 const handleStyle = (position, size) => {
   const half = size / 2;
+  const cursors = {
+    nw: 'nwse-resize',
+    se: 'nwse-resize',
+    ne: 'nesw-resize',
+    sw: 'nesw-resize',
+    n: 'ns-resize',
+    s: 'ns-resize',
+    e: 'ew-resize',
+    w: 'ew-resize',
+  };
   const base = {
     position: 'absolute',
     width: `${size}px`,
@@ -21,6 +31,7 @@ const handleStyle = (position, size) => {
     border: `1px solid ${SELECTION_COLOR}`,
     borderRadius: '50%',
     pointerEvents: 'auto',
+    cursor: cursors[position] ?? 'default',
   };
 
   const positions = {

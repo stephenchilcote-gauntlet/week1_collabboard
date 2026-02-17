@@ -7,6 +7,16 @@ import { boardToScreen } from '../utils/coordinates.js';
 const REMOTE_ENTRY_DURATION_MS = 350;
 const REMOTE_DRAG_WINDOW_MS = 1000;
 const OFFSCREEN_TOAST_DURATION_MS = 3000;
+const RESIZE_CURSORS = {
+  nw: 'nwse-resize',
+  se: 'nwse-resize',
+  ne: 'nesw-resize',
+  sw: 'nesw-resize',
+  n: 'ns-resize',
+  s: 'ns-resize',
+  e: 'ew-resize',
+  w: 'ew-resize',
+};
 
 const emptySet = new Set();
 
@@ -55,6 +65,7 @@ export default function Board({
   const lastNotificationRef = useRef({});
   const [timeNow, setTimeNow] = useState(() => Date.now());
   const pointerCaptureRef = useRef(null);
+  const [activeResizeCursor, setActiveResizeCursor] = useState('');
 
   const sortedObjects = useMemo(() => Object.values(objects ?? {}).sort((a, b) => (
     (a.zIndex ?? 0) - (b.zIndex ?? 0)
@@ -257,7 +268,9 @@ export default function Board({
           event.clientY - rect.top,
         );
         capturePointer(event);
+        setActiveResizeCursor(RESIZE_CURSORS[handlePosition] ?? '');
       }
+      event.preventDefault();
       return;
     }
 
@@ -296,6 +309,7 @@ export default function Board({
     const containerY = event.clientY - rect.top;
     onDragEnd?.(containerX, containerY);
     onResizeEnd?.();
+    setActiveResizeCursor('');
     handlePanEnd(event.pointerId);
     releasePointer();
   };
@@ -331,6 +345,8 @@ export default function Board({
         width: '100%',
         height: '100%',
         background: '#f0f0f0',
+        touchAction: 'none',
+        cursor: activeResizeCursor || undefined,
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
