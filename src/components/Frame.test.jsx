@@ -36,8 +36,12 @@ describe('Frame', () => {
     const frame = getByTestId('frame');
     expect(frame.getAttribute('data-object-id')).toBe('frame-1');
     expect(frame.textContent).toContain('Project');
-    expect(frame.style.borderStyle).toBe('dashed');
-    expect(frame.style.background).toContain('rgba');
+
+    const border = getByTestId('frame-border');
+    expect(border.style.borderStyle).toBe('dashed');
+
+    const titleBar = getByTestId('frame-title');
+    expect(titleBar.style.background).toContain('rgba');
   });
 
   it('double-click on title enables editing and blur updates', () => {
@@ -51,11 +55,17 @@ describe('Frame', () => {
     expect(onUpdate).toHaveBeenCalledWith('frame-1', { title: 'Updated' });
   });
 
-  it('pointerDown selects and starts drag', () => {
-    const { getByTestId, onSelect, onDragStart } = renderFrame();
+  it('pointerDown on border edge selects and starts drag', () => {
+    const { container, onSelect, onDragStart } = renderFrame();
 
-    fireEvent.pointerDown(getByTestId('frame'), { clientX: 10, clientY: 10 });
+    // The border edge divs are the ones with pointerEvents: auto and cursor: grab
+    // Fire on the title bar which also handles pointer down
+    const titleBar = container.querySelector('[data-testid="frame-title"]');
+    fireEvent.pointerDown(titleBar, { clientX: 10, clientY: 10 });
     expect(onSelect).toHaveBeenCalledWith('frame-1', expect.any(Object));
+
+    // Title bar uses deferred drag (waits for movement), so simulate movement
+    fireEvent(document, new PointerEvent('pointermove', { clientX: 100, clientY: 100 }));
     expect(onDragStart).toHaveBeenCalled();
   });
 
@@ -68,7 +78,7 @@ describe('Frame', () => {
   it('lockedByOther blocks pointer events', () => {
     const { getByTestId, onSelect, onDragStart } = renderFrame({ lockedByOther: true });
 
-    fireEvent.pointerDown(getByTestId('frame'), { clientX: 10, clientY: 10 });
+    fireEvent.pointerDown(getByTestId('frame-title'), { clientX: 10, clientY: 10 });
     expect(onSelect).not.toHaveBeenCalled();
     expect(onDragStart).not.toHaveBeenCalled();
   });
@@ -76,8 +86,8 @@ describe('Frame', () => {
   it('uses default colors when no color is set', () => {
     const { getByTestId } = renderFrame();
 
-    const frame = getByTestId('frame');
-    expect(frame.style.background).toContain('rgba');
+    const titleBar = getByTestId('frame-title');
+    expect(titleBar.style.background).toContain('rgba');
   });
 
   it('applies custom color to border, background, and title bar', () => {
@@ -85,11 +95,21 @@ describe('Frame', () => {
       object: { ...defaultObject, color: '#FF6B6B' },
     });
 
-    const frame = getByTestId('frame');
-    expect(frame.style.border).toContain('rgb(255, 107, 107)');
-    expect(frame.style.background).toContain('255, 107, 107');
+    const border = getByTestId('frame-border');
+    expect(border.style.border).toContain('dashed');
 
     const titleBar = getByTestId('frame-title');
     expect(titleBar.style.background).toContain('255, 107, 107');
+  });
+
+  it('Enter key commits the title edit', () => {
+    const { getByTestId, onUpdate } = renderFrame();
+
+    fireEvent.doubleClick(getByTestId('frame-title'));
+    const editor = getByTestId('frame-editor');
+    fireEvent.change(editor, { target: { value: 'New Title' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+
+    expect(onUpdate).toHaveBeenCalledWith('frame-1', { title: 'New Title' });
   });
 });

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { isClickThreshold } from '../hooks/useDrag.js';
 
 export default function Frame({
   object,
@@ -19,6 +20,7 @@ export default function Frame({
   const [draftTitle, setDraftTitle] = useState(object.title ?? '');
   const inputRef = useRef(null);
   const prevEditingRef = useRef(false);
+  const pendingDragRef = useRef(null);
 
   useEffect(() => {
     if (!isEditing) {
@@ -29,12 +31,23 @@ export default function Frame({
   useEffect(() => {
     if (isEditing) {
       inputRef.current?.focus();
+      inputRef.current?.select();
     }
     if (isEditing !== prevEditingRef.current) {
       prevEditingRef.current = isEditing;
       onEditStateChange?.(object.id, isEditing);
     }
   }, [isEditing, object.id, onEditStateChange]);
+
+  const cleanupPendingDrag = () => {
+    if (pendingDragRef.current) {
+      document.removeEventListener('pointermove', pendingDragRef.current.onMove);
+      document.removeEventListener('pointerup', pendingDragRef.current.onUp);
+      pendingDragRef.current = null;
+    }
+  };
+
+  useEffect(() => cleanupPendingDrag, []);
 
   const handlePointerDown = (event) => {
     if (lockedByOther) {
@@ -45,6 +58,37 @@ export default function Frame({
       return;
     }
     onDragStart?.(object, event);
+  };
+
+  const handleTitlePointerDown = (event) => {
+    if (lockedByOther) {
+      return;
+    }
+    onSelect?.(object.id, event);
+    if (interactionMode === 'connecting' || isEditing) {
+      return;
+    }
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const origEvent = event.nativeEvent;
+
+    const onMove = (moveEvent) => {
+      const dx = moveEvent.clientX - startX;
+      const dy = moveEvent.clientY - startY;
+      if (!isClickThreshold(dx, dy)) {
+        cleanupPendingDrag();
+        onDragStart?.(object, origEvent);
+      }
+    };
+
+    const onUp = () => {
+      cleanupPendingDrag();
+    };
+
+    cleanupPendingDrag();
+    pendingDragRef.current = { onMove, onUp };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp, { once: true });
   };
 
   const handleTitleDoubleClick = (event) => {
@@ -62,7 +106,7 @@ export default function Frame({
 
   const handleKeyDown = (event) => {
     event.stopPropagation();
-    if (event.key === 'Escape') {
+    if (event.key === 'Escape' || event.key === 'Enter') {
       event.currentTarget.blur();
     }
   };
@@ -120,6 +164,7 @@ export default function Frame({
       ))}
       {/* Dashed border outline */}
       <div
+        data-testid="frame-border"
         style={{
           position: 'absolute',
           inset: 0,
@@ -130,7 +175,7 @@ export default function Frame({
         }}
       />
       <div
-        onPointerDown={handlePointerDown}
+        onPointerDown={handleTitlePointerDown}
         style={{
           position: 'absolute',
           top: 0,
