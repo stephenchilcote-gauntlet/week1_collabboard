@@ -32,6 +32,7 @@ const handleStyle = (position, size) => {
     borderRadius: '50%',
     pointerEvents: 'auto',
     cursor: cursors[position] ?? 'default',
+    transition: 'background 150ms ease, box-shadow 150ms ease',
   };
 
   const positions = {
