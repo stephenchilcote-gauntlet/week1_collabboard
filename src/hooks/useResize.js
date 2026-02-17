@@ -5,73 +5,79 @@ import { throttle } from '../utils/throttle.js';
 const MIN_SIZE = 20;
 
 export const clampResize = (bounds, handle, dx, dy, options = {}) => {
-  let { x, y, width, height } = bounds;
-  const { keepAspect = false } = options;
-  const aspect = width / height || 1;
+  const { keepAspect = false, symmetric = false } = options;
+  const aspect = bounds.width / bounds.height || 1;
 
-  const applyX = handle.includes('w') || handle === 'w' || handle === 'nw' || handle === 'sw';
-  const applyY = handle.includes('n') || handle === 'n' || handle === 'ne' || handle === 'nw';
-  const applyRight = handle.includes('e') || handle === 'e' || handle === 'ne' || handle === 'se';
-  const applyBottom = handle.includes('s') || handle === 's' || handle === 'se' || handle === 'sw';
+  let left = bounds.x;
+  let top = bounds.y;
+  let right = bounds.x + bounds.width;
+  let bottom = bounds.y + bounds.height;
 
-  if (keepAspect && (applyX || applyRight || applyY || applyBottom)) {
-    const delta = Math.abs(dx) > Math.abs(dy) ? dx : dy;
-    if (applyX) {
-      x += delta;
-      width -= delta;
-    }
-    if (applyRight) {
-      width += delta;
-    }
-    if (applyY) {
-      y += delta;
-      height -= delta;
-    }
-    if (applyBottom) {
-      height += delta;
-    }
-    if (width / height > aspect) {
-      width = height * aspect;
-    } else {
-      height = width / aspect;
-    }
+  const moveW = handle.includes('w');
+  const moveE = handle.includes('e');
+  const moveN = handle.includes('n');
+  const moveS = handle.includes('s');
+  const isCorner = (moveW || moveE) && (moveN || moveS);
+
+  // Apply raw deltas to the edges the handle controls
+  // For symmetric mode (circles), edge handles grow both sides equally from center
+  if (symmetric && !isCorner) {
+    if (moveW) { left += dx; right -= dx; }
+    if (moveE) { right += dx; left -= dx; }
+    if (moveN) { top += dy; bottom -= dy; }
+    if (moveS) { bottom += dy; top -= dy; }
   } else {
-    if (applyX) {
-      x += dx;
-      width -= dx;
-    }
-    if (applyRight) {
-      width += dx;
-    }
-    if (applyY) {
-      y += dy;
-      height -= dy;
-    }
-    if (applyBottom) {
-      height += dy;
-    }
+    if (moveW) left += dx;
+    if (moveE) right += dx;
+    if (moveN) top += dy;
+    if (moveS) bottom += dy;
   }
 
+  let width = right - left;
+  let height = bottom - top;
+
+  // Prevent inversion
   if (width < MIN_SIZE) {
-    if (applyX) {
-      x -= MIN_SIZE - width;
-    }
-    width = MIN_SIZE;
+    if (moveW && !moveE) left = right - MIN_SIZE;
+    else right = left + MIN_SIZE;
+    width = right - left;
   }
   if (height < MIN_SIZE) {
-    if (applyY) {
-      y -= MIN_SIZE - height;
-    }
-    height = MIN_SIZE;
+    if (moveN && !moveS) top = bottom - MIN_SIZE;
+    else bottom = top + MIN_SIZE;
+    height = bottom - top;
   }
 
-  return { x, y, width, height };
+  // Aspect-ratio lock (corners only — edge handles allow free resize)
+  if (keepAspect && isCorner) {
+    const driveX = Math.abs(dx) >= Math.abs(dy * aspect);
+    if (driveX) {
+      width = Math.max(MIN_SIZE, right - left);
+      height = width / aspect;
+      if (moveN) top = bottom - height;
+      else bottom = top + height;
+    } else {
+      height = Math.max(MIN_SIZE, bottom - top);
+      width = height * aspect;
+      if (moveW) left = right - width;
+      else right = left + width;
+    }
+  }
+
+  // Final min-size clamp
+  width = right - left;
+  height = bottom - top;
+  if (width < MIN_SIZE) right = left + MIN_SIZE;
+  if (height < MIN_SIZE) bottom = top + MIN_SIZE;
+
+  return { x: left, y: top, width: right - left, height: bottom - top };
 };
 
 export const useResize = (viewport, updateObject, onResizeStateChange) => {
   const [resizingId, setResizingId] = useState(null);
   const groupRef = useRef(null);
   const keepAspectRef = useRef(false);
+  const symmetricRef = useRef(false);
   const initialBounds = useRef(null);
   const handleRef = useRef(null);
   const startPointer = useRef({ x: 0, y: 0 });
@@ -91,6 +97,7 @@ export const useResize = (viewport, updateObject, onResizeStateChange) => {
     initialBounds.current = { x: object.x, y: object.y, width: object.width, height: object.height };
     handleRef.current = handlePosition;
     keepAspectRef.current = Boolean(options.keepAspect);
+    symmetricRef.current = Boolean(options.symmetric);
     startPointer.current = { x: containerX, y: containerY };
     if (options.groupBounds && options.groupItems) {
       groupRef.current = {
@@ -111,7 +118,7 @@ export const useResize = (viewport, updateObject, onResizeStateChange) => {
     const current = screenToBoard(containerX, containerY, vp.panX, vp.panY, vp.zoom);
     const dx = current.x - start.x;
     const dy = current.y - start.y;
-    const next = clampResize(initialBounds.current, handleRef.current, dx, dy, { keepAspect: keepAspectRef.current });
+    const next = clampResize(initialBounds.current, handleRef.current, dx, dy, { keepAspect: keepAspectRef.current, symmetric: symmetricRef.current });
     if (groupRef.current) {
       const { bounds, items } = groupRef.current;
       const scaleX = next.width / bounds.width;

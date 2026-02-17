@@ -20,7 +20,7 @@ import { useInteractionState } from './hooks/useInteractionState.js';
 import { useClipboard } from './hooks/useClipboard.js';
 import { useUndoRedo } from './hooks/useUndoRedo.js';
 import { useRotation } from './hooks/useRotation.js';
-import { boardToScreen, rectFromPoints } from './utils/coordinates.js';
+import { boardToScreen, rectFromPoints, containsRect, getObjectBounds } from './utils/coordinates.js';
 
 const BoardShell = ({ user }) => {
   const [errorMessage, setErrorMessage] = useState('');
@@ -290,7 +290,9 @@ const BoardShell = ({ user }) => {
     if (connectorFromId === objectId) {
       return;
     }
-    createConnector(connectorFromId, objectId, 'line', sortedZIndex + 1)
+    const fromZ = objects[connectorFromId]?.zIndex ?? 0;
+    const toZ = objects[objectId]?.zIndex ?? 0;
+    createConnector(connectorFromId, objectId, 'line', Math.min(fromZ, toZ) - 1)
       .then((connector) => {
         undoRedo.push({ type: 'create', object: connector });
       })
@@ -345,9 +347,23 @@ const BoardShell = ({ user }) => {
   }, [objects, updateObject]);
 
   const handleDragStart = (object, containerX, containerY) => {
-    const selectedObjects = selection.selectedIds.size > 1
+    let selectedObjects = selection.selectedIds.size > 1
       ? Array.from(selection.selectedIds).map((id) => objects[id]).filter(Boolean)
       : null;
+
+    if (object.type === 'frame' && !selectedObjects) {
+      const frameBounds = getObjectBounds(object);
+      const children = Object.values(objects ?? {}).filter((obj) => {
+        if (obj.id === object.id) return false;
+        const objBounds = getObjectBounds(obj);
+        return containsRect(frameBounds, objBounds);
+      });
+      if (children.length > 0) {
+        selectedObjects = [object, ...children];
+        selection.setSelection(selectedObjects.map((o) => o.id));
+      }
+    }
+
     dragStart(object, containerX, containerY, selectedObjects);
     handleUpdateObject(object.id, { zIndex: sortedZIndex + 1 });
     if (selectedObjects) {
@@ -368,7 +384,8 @@ const BoardShell = ({ user }) => {
       ? Array.from(selection.selectedIds).map((id) => objects[id]).filter(Boolean)
       : null;
     resizeStart(object, handlePosition, containerX, containerY, {
-      keepAspect: object.type === 'circle',
+      keepAspect: object.type === 'circle' && ['nw', 'ne', 'sw', 'se'].includes(handlePosition),
+      symmetric: object.type === 'circle',
       groupBounds: groupItems ? selectionBounds : null,
       groupItems,
     });
@@ -486,16 +503,62 @@ const BoardShell = ({ user }) => {
         onDeleteSelected={handleDeleteSelected}
         selectedId={selection.selectedId}
         interactionMode={interactionState.mode}
+        connectorMode={connectorMode}
+        connectorFromId={connectorFromId}
       />
+      {connectorMode && (
+        <div style={{
+          position: 'fixed',
+          top: 16,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 210,
+          background: 'rgba(17, 24, 39, 0.9)',
+          color: '#f9fafb',
+          padding: '10px 16px',
+          borderRadius: 10,
+          fontSize: 13,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+        }}>
+          <span>{connectorFromId ? 'Connector mode: Click second object' : 'Connector mode: Click first object'}</span>
+          <button
+            onClick={() => { setConnectorMode(false); setConnectorFromId(null); }}
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.3)',
+              color: '#93c5fd',
+              padding: '4px 12px',
+              borderRadius: 6,
+              fontSize: 13,
+              cursor: 'pointer',
+              transition: 'background 0.15s, color 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+              e.currentTarget.style.color = '#bfdbfe';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.color = '#93c5fd';
+            }}
+          >
+            Cancel (Esc)
+          </button>
+        </div>
+      )}
       {(() => {
         const selObj = selection.selectedId ? objects?.[selection.selectedId] : null;
         if (!selObj) return null;
         const { panX, panY, zoom } = viewport;
-        const screenPos = boardToScreen(selObj.x, selObj.y + (selObj.height ?? 0), panX, panY, zoom);
+        const bounds = getObjectBounds(selObj);
+        const screenPos = boardToScreen(bounds.x, bounds.y + bounds.height, panX, panY, zoom);
         const paletteHeight = 50;
         const showAbove = screenPos.y + 8 + paletteHeight > viewport.viewportHeight;
         const topPos = showAbove
-          ? screenPos.y - (selObj.height ?? 0) * zoom - paletteHeight
+          ? screenPos.y - bounds.height * zoom - paletteHeight
           : screenPos.y + 8;
         return (
           <div style={{
@@ -504,7 +567,7 @@ const BoardShell = ({ user }) => {
             top: topPos,
             zIndex: 160,
             transform: 'translateX(-50%)',
-            marginLeft: ((selObj.width ?? 0) * zoom) / 2,
+            marginLeft: (bounds.width * zoom) / 2,
           }}>
             <ColorPalette
               selectedObject={selObj}
