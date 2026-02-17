@@ -20,6 +20,7 @@ describe('StickyNote', () => {
 
     const note = getByTestId('sticky-note');
     expect(note.getAttribute('data-object-id')).toBe('note1');
+    expect(note.style.width).toBe('200px');
 
     fireEvent.doubleClick(note);
     const textarea = getByTestId('sticky-editor');

@@ -84,8 +84,8 @@ export default function StickyNote({
         position: 'absolute',
         left: object.x,
         top: object.y,
-        width: 200,
-        minHeight: 150,
+        width: object.width ?? 200,
+        height: object.height ?? 150,
         background: object.color,
         border: '2px solid rgba(0,0,0,0.1)',
         borderRadius: 6,
@@ -98,6 +98,7 @@ export default function StickyNote({
         opacity: isEntering ? 0 : 1,
         transition: 'opacity 300ms ease, box-shadow 300ms ease',
         boxShadow: isHighlighted ? '0 0 0 4px rgba(59, 130, 246, 0.35)' : 'none',
+        overflow: 'hidden',
       }}
     >
       {isEditing ? (
@@ -112,7 +113,7 @@ export default function StickyNote({
           onPointerDown={handleTextPointerDown}
           style={{
             width: '100%',
-            minHeight: 120,
+            height: '100%',
             border: 'none',
             outline: 'none',
             resize: 'none',
@@ -122,7 +123,7 @@ export default function StickyNote({
           }}
         />
       ) : (
-        <div>{object.text}</div>
+        <div style={{ height: '100%', overflow: 'auto' }}>{object.text}</div>
       )}
     </div>
   );

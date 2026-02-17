@@ -424,7 +424,7 @@ export default function Board({
         {selectedObject && (
           <SelectionOverlay
             object={selectedObject}
-            isRectangle={selectedObject.type === 'rectangle'}
+            isResizable={selectedObject.type === 'rectangle' || selectedObject.type === 'sticky'}
             zoom={zoom}
           />
         )}

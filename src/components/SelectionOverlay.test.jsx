@@ -12,7 +12,7 @@ describe('SelectionOverlay', () => {
 
   it('renders resize handles for rectangles sized by zoom', () => {
     const { getAllByTestId } = render(
-      <SelectionOverlay object={{ x: 0, y: 0, width: 100, height: 80 }} isRectangle zoom={2} />,
+      <SelectionOverlay object={{ x: 0, y: 0, width: 100, height: 80 }} isResizable zoom={2} />,
     );
     const handles = getAllByTestId('resize-handle');
     expect(handles).toHaveLength(8);

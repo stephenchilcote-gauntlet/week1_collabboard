@@ -37,7 +37,7 @@ const handleStyle = (position, size) => {
   return { ...base, ...positions[position] };
 };
 
-export default function SelectionOverlay({ object, isRectangle, zoom }) {
+export default function SelectionOverlay({ object, isResizable, zoom }) {
   const { x, y, width, height } = object;
   const handleSize = 8 / zoom;
 
@@ -50,12 +50,13 @@ export default function SelectionOverlay({ object, isRectangle, zoom }) {
         width,
         height,
         border: `2px solid ${SELECTION_COLOR}`,
+        zIndex: (object.zIndex ?? 0) + 1,
         pointerEvents: 'none',
         boxSizing: 'border-box',
       }}
       data-testid="selection-border"
     >
-      {isRectangle && HANDLE_POSITIONS.map((position) => (
+      {isResizable && HANDLE_POSITIONS.map((position) => (
         <div
           key={position}
           data-testid="resize-handle"
