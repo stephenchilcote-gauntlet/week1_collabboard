@@ -664,7 +664,7 @@ src/
 |-------|-------|
 | **Stories** | 4.4, 4.3, C.1a |
 | **Prerequisites** | None (pure state) |
-| **Exports** | `useSelection()` hook |
+| **Exports** | `useSelection(objects, user, presenceList)` hook |
 
 #### Unit 3-A-1: `useSelection` — State shape
 
@@ -715,6 +715,26 @@ src/
 | **Invariant** | If the object referenced by `selectedId` no longer exists in the objects map, selection auto-clears |
 | **Constraints** | Story 5.2 — if selected object is deleted by remote user, selection clears |
 | **Plan** | Derive: if `selectedId && !objects[selectedId]`, clear. Effect or inline check in render. |
+
+#### Unit 3-A-6: `useSelection` — Mutual exclusion (remote locking)
+
+| Field | Value |
+|-------|-------|
+| **Input** | `remoteSelections` from Firebase `boards/{BOARD_ID}/selections`, `user`, `presenceList` |
+| **Output** | `lockedObjectIds`: map of `objectId → { uid, name }` for objects selected by other **present** users |
+| **Invariant** | A user cannot select an object already selected by another user. `lockedObjectIds` only includes users who appear in `presenceList` (heartbeat-verified present). Stale selection entries from disconnected users are ignored within ~15s (presence TTL). Locked objects appear greyed out (50% opacity, grayscale, `not-allowed` cursor) with a blue name badge. If another user locks the object we currently have selected, our selection auto-clears. |
+| **Constraints** | Story 5.2 — conflict prevention; single-select mutual exclusion |
+| **Plan** | Subscribe to `boards/{BOARD_ID}/selections` via `onValue`. Compute `lockedObjectIds` by filtering remote selections to only users in `presentUids` set (derived from `presenceList`). `select()` checks `lockedRef.current[objectId]` before allowing selection. |
+
+#### Unit 3-A-7: `useSelection` — Selection sync to Firebase
+
+| Field | Value |
+|-------|-------|
+| **Input** | `selectedId`, `user` |
+| **Output** | Firebase write/remove at `boards/{BOARD_ID}/selections/{uid}` |
+| **Invariant** | When `selectedId` is non-null, writes `{ objectId, name }` to Firebase. When null, removes the entry. `onDisconnect().remove()` is registered via `.info/connected` listener (survives reconnections) — set up once per user, not re-registered on every `selectedId` change. On unmount, explicitly removes selection entry. |
+| **Constraints** | Story 7.4 — crash cleanup via `onDisconnect`; no permanently locked objects |
+| **Plan** | Separate effect for `onDisconnect` registration via `.info/connected`. Separate effect for `set()`/`remove()` on `selectedId` change. Unmount cleanup in the `onDisconnect` effect's teardown. |
 
 ---
 
@@ -1194,6 +1214,26 @@ src/
 | **Invariant** | On clean unmount, presence entry is explicitly `remove()`'d (don't rely only on `onDisconnect`). Heartbeat interval is cleared. Firebase listener is unsubscribed. |
 | **Constraints** | Story 8.3 — sign-out removes presence |
 | **Plan** | Cleanup function: `remove(presenceRef)`. `clearInterval(heartbeat)`. `off()` listener. |
+
+#### Unit 7-A-4: `usePresence` — Idle timeout (5 minutes)
+
+| Field | Value |
+|-------|-------|
+| **Input** | User activity events: `pointerdown`, `pointermove`, `keydown`, `wheel`, `touchstart` |
+| **Output** | After 5 minutes of inactivity, presence entry is removed and heartbeat stops. User treated as offline. |
+| **Invariant** | `lastActivityRef` tracks the timestamp of the most recent user interaction. Each heartbeat tick checks `Date.now() - lastActivityRef.current >= IDLE_TIMEOUT_MS` (300,000ms). If idle: stops heartbeat, removes presence entry from Firebase (`goIdle()`). On next activity event: re-registers presence and restarts heartbeat (`goOnline()`). This also releases any selection locks the idle user held (via presence-gated `lockedObjectIds` in Unit 3-A-6). |
+| **Constraints** | Story 7.1 — presence reflects actual engagement, not just an open tab |
+| **Plan** | Activity event listeners on `window` (passive). `lastActivityRef` updated on each event. Heartbeat checks idle threshold. `goIdle()` removes presence + stops heartbeat. `handleActivity()` calls `goOnline()` + restarts heartbeat if currently idle. |
+
+#### Unit 7-A-5: `usePresence` — Tab visibility detection
+
+| Field | Value |
+|-------|-------|
+| **Input** | `document.visibilitychange` event |
+| **Output** | Switching away from the tab immediately removes presence (goes idle). Switching back restores presence. |
+| **Invariant** | `document.hidden === true` triggers `goIdle()` immediately (does not wait for 5-minute timeout). `document.hidden === false` triggers `handleActivity()` which calls `goOnline()` and restarts heartbeat. Combined with Unit 7-A-4, this ensures users who switch tabs or minimize the window are promptly treated as offline, releasing their selection locks. |
+| **Constraints** | Story 7.1 — fast leave detection for tab switches |
+| **Plan** | `document.addEventListener('visibilitychange', ...)`. Check `document.hidden` to call `goIdle()` or `handleActivity()`. Listener removed in cleanup. |
 
 ---
 
