@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import StickyNote from './StickyNote.jsx';
 import Rectangle from './Rectangle.jsx';
+import Circle from './Circle.jsx';
+import Line from './Line.jsx';
+import TextElement from './TextElement.jsx';
+import Frame from './Frame.jsx';
+import Connector from './Connector.jsx';
 import SelectionOverlay from './SelectionOverlay.jsx';
+import SelectionMarquee from './SelectionMarquee.jsx';
 import { boardToScreen } from '../utils/coordinates.js';
 
 const REMOTE_ENTRY_DURATION_MS = 350;
@@ -27,9 +33,11 @@ export default function Board({
   user,
   localCreatedIds,
   selectedId,
+  selectedIds,
   draggingId,
   lockedObjectIds,
   onSelect,
+  onToggleSelect,
   onClearSelection,
   onUpdateObject,
   onEditingChange,
@@ -39,6 +47,16 @@ export default function Board({
   onResizeStart,
   onResizeMove,
   onResizeEnd,
+  onConnectorCandidate,
+  connectorMode,
+  marqueeBounds,
+  selectionBounds,
+  onMarqueeStart,
+  onMarqueeMove,
+  onMarqueeEnd,
+  onRotationStart,
+  onRotationMove,
+  onRotationEnd,
   onCursorMove,
 }) {
   const fallbackRef = useRef(null);
@@ -72,6 +90,7 @@ export default function Board({
     (a.zIndex ?? 0) - (b.zIndex ?? 0)
   )), [objects]);
   const selectedObject = selectedId ? objects?.[selectedId] : null;
+  const selectionSet = selectedIds ?? emptySet;
 
   const triggerRemoteEntry = useCallback((objectId) => {
     setRemoteEntryPhases((prev) => ({
@@ -190,7 +209,16 @@ export default function Board({
       lastNotificationRef.current[objectId] = now;
       const actor = object.updatedByName ?? 'Someone';
       const action = isNew ? 'added' : 'moved';
-      const label = object.type === 'sticky' ? 'sticky note' : 'rectangle';
+      const labelLookup = {
+        sticky: 'sticky note',
+        rectangle: 'rectangle',
+        circle: 'circle',
+        line: 'line',
+        text: 'text',
+        frame: 'frame',
+        connector: 'connector',
+      };
+      const label = labelLookup[object.type] ?? 'object';
       pushNotification(`${actor} ${action} a ${label}`);
     });
     prevNotificationObjectsRef.current = objects ?? {};
@@ -247,6 +275,18 @@ export default function Board({
       return;
     }
 
+    const rotationHit = event.target.closest('[data-rotation-handle]');
+    if (rotationHit && selectedObject) {
+      const rect = resolvedRef.current?.getBoundingClientRect();
+      if (!rect) {
+        return;
+      }
+      onRotationStart?.(selectedObject, event.clientX - rect.left, event.clientY - rect.top);
+      capturePointer(event);
+      event.preventDefault();
+      return;
+    }
+
     const handleHit = event.target.closest('[data-resize-handle]');
     if (handleHit && selectedObject) {
       const rect = resolvedRef.current?.getBoundingClientRect();
@@ -277,6 +317,14 @@ export default function Board({
     if (!rect) {
       return;
     }
+    if (event.shiftKey && onMarqueeStart) {
+      onMarqueeStart(event.clientX - rect.left, event.clientY - rect.top);
+      capturePointer(event);
+      return;
+    }
+    if (connectorMode) {
+      return;
+    }
     onClearSelection?.();
     handlePanStart(event.clientX - rect.left, event.clientY - rect.top, event.pointerId);
   };
@@ -291,6 +339,8 @@ export default function Board({
     handlePanMove(containerX, containerY);
     onDragMove?.(containerX, containerY);
     onResizeMove?.(containerX, containerY);
+    onRotationMove?.(containerX, containerY);
+    onMarqueeMove?.(containerX, containerY);
     onCursorMove?.(containerX, containerY);
   };
 
@@ -303,6 +353,8 @@ export default function Board({
     const containerY = event.clientY - rect.top;
     onDragEnd?.(containerX, containerY);
     onResizeEnd?.();
+    onRotationEnd?.();
+    onMarqueeEnd?.();
     setActiveResizeCursor('');
     handlePanEnd(event.pointerId);
     releasePointer();
@@ -313,9 +365,25 @@ export default function Board({
     if (!rect) {
       return;
     }
-    onSelect?.(object.id);
+    if (event?.shiftKey) {
+      onToggleSelect?.(object.id);
+    } else {
+      onSelect?.(object.id);
+    }
     onDragStart?.(object, event.clientX - rect.left, event.clientY - rect.top);
     capturePointer(event);
+  };
+
+  const handleObjectSelect = (objectId, event) => {
+    if (event?.shiftKey) {
+      onToggleSelect?.(objectId);
+      return;
+    }
+    if (connectorMode) {
+      onConnectorCandidate?.(objectId);
+      return;
+    }
+    onSelect?.(objectId);
   };
 
   const handleObjectUpdate = (objectId, updates) => {
@@ -341,7 +409,7 @@ export default function Board({
         background: '#f0f0f0',
         touchAction: 'none',
         userSelect: 'none',
-        cursor: activeResizeCursor || (draggingId ? 'grabbing' : isPanning ? 'grabbing' : 'default'),
+        cursor: activeResizeCursor || (draggingId ? 'grabbing' : isPanning ? 'grabbing' : 'grab'),
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -382,31 +450,100 @@ export default function Board({
           const lockedByOther = Boolean(lockEntry);
           return (
             <div key={object.id}>
-              {object.type === 'sticky' ? (
+              {object.type === 'sticky' && (
                 <StickyNote
                   object={object}
-                  isSelected={object.id === selectedId}
+                  isSelected={selectionSet.has(object.id)}
                   isDragging={object.id === draggingId}
                   lockedByOther={lockedByOther}
-                  onSelect={onSelect}
+                  onSelect={handleObjectSelect}
                   onUpdate={handleObjectUpdate}
                   onDragStart={handleObjectDragStart}
                   onEditStateChange={handleEditingStateChange}
                   zoom={zoom}
                   remoteEntryPhase={remoteEntryPhase}
+                  interactionMode={connectorMode ? 'connecting' : 'idle'}
                 />
-              ) : (
+              )}
+              {object.type === 'rectangle' && (
                 <Rectangle
                   object={object}
-                  isSelected={object.id === selectedId}
+                  isSelected={selectionSet.has(object.id)}
                   isDragging={object.id === draggingId}
                   lockedByOther={lockedByOther}
-                  onSelect={onSelect}
+                  onSelect={handleObjectSelect}
                   onUpdate={handleObjectUpdate}
                   onDragStart={handleObjectDragStart}
                   onResizeStart={onResizeStart}
                   zoom={zoom}
                   remoteEntryPhase={remoteEntryPhase}
+                  interactionMode={connectorMode ? 'connecting' : 'idle'}
+                />
+              )}
+              {object.type === 'circle' && (
+                <Circle
+                  object={object}
+                  isSelected={selectionSet.has(object.id)}
+                  isDragging={object.id === draggingId}
+                  lockedByOther={lockedByOther}
+                  onSelect={handleObjectSelect}
+                  onUpdate={handleObjectUpdate}
+                  onDragStart={handleObjectDragStart}
+                  onResizeStart={onResizeStart}
+                  zoom={zoom}
+                  remoteEntryPhase={remoteEntryPhase}
+                  interactionMode={connectorMode ? 'connecting' : 'idle'}
+                />
+              )}
+              {object.type === 'line' && (
+                <Line
+                  object={object}
+                  isSelected={selectionSet.has(object.id)}
+                  isDragging={object.id === draggingId}
+                  lockedByOther={lockedByOther}
+                  onSelect={handleObjectSelect}
+                  onUpdate={handleObjectUpdate}
+                  onDragStart={handleObjectDragStart}
+                  zoom={zoom}
+                  remoteEntryPhase={remoteEntryPhase}
+                  interactionMode={connectorMode ? 'connecting' : 'idle'}
+                />
+              )}
+              {object.type === 'text' && (
+                <TextElement
+                  object={object}
+                  isSelected={selectionSet.has(object.id)}
+                  isDragging={object.id === draggingId}
+                  lockedByOther={lockedByOther}
+                  onSelect={handleObjectSelect}
+                  onUpdate={handleObjectUpdate}
+                  onDragStart={handleObjectDragStart}
+                  onResizeStart={onResizeStart}
+                  zoom={zoom}
+                  remoteEntryPhase={remoteEntryPhase}
+                  interactionMode={connectorMode ? 'connecting' : 'idle'}
+                />
+              )}
+              {object.type === 'frame' && (
+                <Frame
+                  object={object}
+                  isSelected={selectionSet.has(object.id)}
+                  isDragging={object.id === draggingId}
+                  lockedByOther={lockedByOther}
+                  onSelect={handleObjectSelect}
+                  onUpdate={handleObjectUpdate}
+                  onDragStart={handleObjectDragStart}
+                  onResizeStart={onResizeStart}
+                  zoom={zoom}
+                  remoteEntryPhase={remoteEntryPhase}
+                  interactionMode={connectorMode ? 'connecting' : 'idle'}
+                />
+              )}
+              {object.type === 'connector' && (
+                <Connector
+                  connector={object}
+                  objects={objects}
+                  onSelect={handleObjectSelect}
                 />
               )}
               {lockedByOther && (
@@ -455,10 +592,14 @@ export default function Board({
         )}
         {selectedObject && (
           <SelectionOverlay
-            object={selectedObject}
-            isResizable={selectedObject.type === 'rectangle' || selectedObject.type === 'sticky'}
+            object={selectionBounds ?? selectedObject}
+            isResizable={selectedObject.type === 'rectangle' || selectedObject.type === 'sticky' || selectedObject.type === 'circle' || selectedObject.type === 'text' || selectedObject.type === 'frame'}
             zoom={zoom}
+            showRotation={selectedObject.type !== 'line' && selectedObject.type !== 'connector'}
           />
+        )}
+        {marqueeBounds && (
+          <SelectionMarquee bounds={marqueeBounds} zoom={zoom} />
         )}
       </div>
       {notifications.length > 0 && (

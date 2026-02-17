@@ -14,6 +14,7 @@ function renderRect(props = {}) {
     onDragStart: vi.fn(),
     onResizeStart: vi.fn(),
     zoom: 1,
+    interactionMode: 'idle',
   };
   const merged = { ...defaults, ...props };
   return { ...render(<Rectangle {...merged} />), ...merged };

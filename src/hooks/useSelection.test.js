@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import { test, fc } from '@fast-check/vitest';
 import { useSelection } from './useSelection.js';
 
 const mockOnValue = vi.fn();
@@ -38,6 +39,7 @@ describe('useSelection', () => {
   it('starts with no selection', () => {
     const { result } = renderHook(() => useSelection());
     expect(result.current.selectedId).toBeNull();
+    expect(result.current.selectedIds.size).toBe(0);
   });
 
   it('selects an object id', () => {
@@ -48,6 +50,7 @@ describe('useSelection', () => {
     });
 
     expect(result.current.selectedId).toBe('object-1');
+    expect(Array.from(result.current.selectedIds)).toEqual(['object-1']);
   });
 
   it('clears selection', () => {
@@ -62,6 +65,7 @@ describe('useSelection', () => {
     });
 
     expect(result.current.selectedId).toBeNull();
+    expect(result.current.selectedIds.size).toBe(0);
   });
 
   it('clears selection when object is removed', () => {
@@ -137,6 +141,59 @@ describe('useSelection', () => {
       undefined,
       { objectId: 'note-1', name: 'Me' },
     );
+  });
+
+  it('shift+click toggles selection set', () => {
+    const { result } = renderHook(() => useSelection({
+      a: { id: 'a' },
+      b: { id: 'b' },
+    }));
+
+    act(() => {
+      result.current.select('a');
+    });
+
+    act(() => {
+      result.current.toggleSelection('b');
+    });
+
+    expect(result.current.selectedIds.size).toBe(2);
+
+    act(() => {
+      result.current.toggleSelection('a');
+    });
+
+    expect(result.current.selectedIds.has('a')).toBe(false);
+  });
+
+  test.prop([
+    fc.array(fc.record({
+      id: fc.string({ minLength: 1, maxLength: 6 }).filter((value) => value.trim().length > 0),
+      x: fc.integer({ min: 0, max: 200 }),
+      y: fc.integer({ min: 0, max: 200 }),
+      width: fc.integer({ min: 10, max: 80 }),
+      height: fc.integer({ min: 10, max: 80 }),
+    }), { minLength: 1, maxLength: 10 }),
+    fc.record({
+      x: fc.integer({ min: 0, max: 200 }),
+      y: fc.integer({ min: 0, max: 200 }),
+      width: fc.integer({ min: 20, max: 120 }),
+      height: fc.integer({ min: 20, max: 120 }),
+    }),
+  ])('getIntersectingIds returns objects overlapping marquee', (items, marquee) => {
+    const objects = items.reduce((acc, item) => {
+      acc[item.id] = item;
+      return acc;
+    }, {});
+    const { result } = renderHook(() => useSelection(objects));
+    const intersecting = result.current.getIntersectingIds(objects, marquee);
+    const expected = items.filter((item) => (
+      item.x <= marquee.x + marquee.width
+      && item.x + item.width >= marquee.x
+      && item.y <= marquee.y + marquee.height
+      && item.y + item.height >= marquee.y
+    )).map((item) => item.id);
+    expect(new Set(intersecting)).toEqual(new Set(expected));
   });
 
   it('removes selection from Firebase on clearSelection', () => {
@@ -228,5 +285,30 @@ describe('useSelection', () => {
 
     expect(mockOnDisconnect).toHaveBeenCalled();
     expect(disconnectRemove).toHaveBeenCalled();
+  });
+
+  it('setSelection filters out locked object ids', () => {
+    const user = { uid: 'me', displayName: 'Me' };
+    const presenceList = [{ uid: 'me', name: 'Me' }, { uid: 'other_user', name: 'Alex' }];
+    mockOnValue.mockImplementation((_ref, callback) => {
+      callback({
+        val: () => ({
+          other_user: { objectId: 'locked', name: 'Alex' },
+        }),
+      });
+      return vi.fn();
+    });
+
+    const { result } = renderHook(() => useSelection({
+      locked: { id: 'locked' },
+      open: { id: 'open' },
+    }, user, presenceList));
+
+    act(() => {
+      result.current.setSelection(['locked', 'open']);
+    });
+
+    expect(result.current.selectedIds.has('locked')).toBe(false);
+    expect(result.current.selectedIds.has('open')).toBe(true);
   });
 });

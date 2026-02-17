@@ -18,3 +18,18 @@ export const boardToScreen = (boardX, boardY, panX, panY, zoom) => {
 
 export const viewportCenter = (panX, panY, zoom, viewportWidth, viewportHeight) =>
   screenToBoard(viewportWidth / 2, viewportHeight / 2, panX, panY, zoom);
+
+export const rectFromPoints = (start, end) => {
+  const x = Math.min(start.x, end.x);
+  const y = Math.min(start.y, end.y);
+  const width = Math.abs(end.x - start.x);
+  const height = Math.abs(end.y - start.y);
+  return { x, y, width, height };
+};
+
+export const intersectsRect = (a, b) => (
+  a.x <= b.x + b.width
+  && a.x + a.width >= b.x
+  && a.y <= b.y + b.height
+  && a.y + a.height >= b.y
+);

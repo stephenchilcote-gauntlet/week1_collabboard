@@ -49,9 +49,11 @@ const handleStyle = (position, size) => {
   return { ...base, ...positions[position] };
 };
 
-export default function SelectionOverlay({ object, isResizable, zoom }) {
+export default function SelectionOverlay({ object, isResizable, zoom, showRotation }) {
   const { x, y, width, height } = object;
   const handleSize = 8 / zoom;
+  const rotationHandleSize = 10 / zoom;
+  const rotationHandleOffset = 24 / zoom;
 
   return (
     <div
@@ -68,6 +70,25 @@ export default function SelectionOverlay({ object, isResizable, zoom }) {
       }}
       data-testid="selection-border"
     >
+      {showRotation && (
+        <div
+          data-testid="rotation-handle"
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: -rotationHandleOffset,
+            transform: 'translateX(-50%)',
+            width: rotationHandleSize,
+            height: rotationHandleSize,
+            borderRadius: '50%',
+            background: '#fff',
+            border: `2px solid ${SELECTION_COLOR}`,
+            pointerEvents: 'auto',
+            cursor: 'grab',
+          }}
+          data-rotation-handle
+        />
+      )}
       {isResizable && HANDLE_POSITIONS.map((position) => (
         <div
           key={position}

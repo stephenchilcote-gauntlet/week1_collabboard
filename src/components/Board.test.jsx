@@ -37,6 +37,17 @@ const baseProps = {
   onResizeStart: vi.fn(),
   onResizeMove: vi.fn(),
   onResizeEnd: vi.fn(),
+  onRotationStart: vi.fn(),
+  onRotationMove: vi.fn(),
+  onRotationEnd: vi.fn(),
+  onConnectorCandidate: vi.fn(),
+  connectorMode: false,
+  connectorFromId: null,
+  selectionBounds: null,
+  marqueeBounds: null,
+  onMarqueeStart: vi.fn(),
+  onMarqueeMove: vi.fn(),
+  onMarqueeEnd: vi.fn(),
   onCursorMove: vi.fn(),
 };
 
@@ -46,7 +57,7 @@ describe('Board', () => {
   });
 
   it('renders board structure and dot grid', () => {
-    const { getByTestId } = render(<Board {...baseProps} />);
+    const { getByTestId } = render(<Board {...baseProps} selectedIds={new Set()} />);
     const outer = getByTestId('board-outer');
     const inner = getByTestId('board-inner');
 
@@ -56,7 +67,7 @@ describe('Board', () => {
   });
 
   it('routes pointer down to pan when clicking empty space', () => {
-    const { getByTestId } = render(<Board {...baseProps} />);
+    const { getByTestId } = render(<Board {...baseProps} selectedIds={new Set()} />);
     const outer = getByTestId('board-outer');
 
     fireEvent.pointerDown(outer, { button: 0, clientX: 10, clientY: 20, pointerId: 7 });
@@ -65,11 +76,12 @@ describe('Board', () => {
   });
 
   it('highlights newly synced remote objects', async () => {
-    const { rerender, getByTestId } = render(<Board {...baseProps} objects={{}} />);
+    const { rerender, getByTestId } = render(<Board {...baseProps} objects={{}} selectedIds={new Set()} />);
 
     rerender(
       <Board
         {...baseProps}
+        selectedIds={new Set()}
         objects={{
           remote1: {
             id: 'remote1',
@@ -96,6 +108,7 @@ describe('Board', () => {
     const { getByTestId } = render(
       <Board
         {...baseProps}
+        selectedIds={new Set()}
         lockedObjectIds={{ remote1: { uid: 'other', name: 'Taylor' } }}
         objects={{
           remote1: {
@@ -118,11 +131,12 @@ describe('Board', () => {
   });
 
   it('notifies when remote changes happen off screen', async () => {
-    const { rerender, getByTestId } = render(<Board {...baseProps} objects={{}} />);
+    const { rerender, getByTestId } = render(<Board {...baseProps} objects={{}} selectedIds={new Set()} />);
 
     rerender(
       <Board
         {...baseProps}
+        selectedIds={new Set()}
         objects={{
           remote1: {
             id: 'remote1',
@@ -157,6 +171,7 @@ describe('Board', () => {
       <Board
         {...baseProps}
         selectedId="note1"
+        selectedIds={new Set(['note1'])}
         objects={{
           note1: {
             id: 'note1',
@@ -176,15 +191,26 @@ describe('Board', () => {
     expect(getAllByTestId('resize-handle')).toHaveLength(8);
   });
 
+  it('renders selection marquee when bounds are provided', () => {
+    const { getByTestId } = render(
+      <Board
+        {...baseProps}
+        marqueeBounds={{ x: 10, y: 20, width: 100, height: 80 }}
+      />,
+    );
+
+    expect(getByTestId('selection-marquee')).toBeInTheDocument();
+  });
+
   it('shows grab cursor by default', () => {
-    const { getByTestId } = render(<Board {...baseProps} />);
+    const { getByTestId } = render(<Board {...baseProps} selectedIds={new Set()} />);
     const outer = getByTestId('board-outer');
     expect(outer.style.cursor).toBe('grab');
   });
 
   it('shows empty board hint when no objects are loaded', () => {
     const { getByTestId, queryByTestId, rerender } = render(
-      <Board {...baseProps} objects={{}} objectsLoaded={true} />,
+      <Board {...baseProps} objects={{}} objectsLoaded={true} selectedIds={new Set()} />,
     );
 
     expect(getByTestId('empty-board-hint')).toBeInTheDocument();
@@ -193,6 +219,7 @@ describe('Board', () => {
       <Board
         {...baseProps}
         objectsLoaded={true}
+        selectedIds={new Set()}
         objects={{
           note1: {
             id: 'note1',
@@ -214,7 +241,7 @@ describe('Board', () => {
 
   it('shows grabbing cursor while panning', () => {
     const { getByTestId } = render(
-      <Board {...baseProps} viewport={{ ...baseProps.viewport, isPanning: true }} />,
+      <Board {...baseProps} viewport={{ ...baseProps.viewport, isPanning: true }} selectedIds={new Set()} />,
     );
     const outer = getByTestId('board-outer');
     expect(outer.style.cursor).toBe('grabbing');

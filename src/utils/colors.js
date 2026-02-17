@@ -15,6 +15,10 @@ export const OBJECT_COLORS = [
 ];
 export const DEFAULT_STICKY_COLOR = '#FFD700';
 export const DEFAULT_RECTANGLE_COLOR = '#4ECDC4';
+export const DEFAULT_CIRCLE_COLOR = '#FF6B6B';
+export const DEFAULT_LINE_COLOR = '#45B7D1';
+export const DEFAULT_TEXT_COLOR = '#111827';
+export const DEFAULT_FRAME_COLOR = 'rgba(148, 163, 184, 0.15)';
 
 const hashUid = (uid) => {
   let hash = 5381;

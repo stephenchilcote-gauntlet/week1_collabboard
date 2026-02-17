@@ -1,4 +1,4 @@
-export default function Rectangle({
+export default function Circle({
   object,
   isSelected,
   isDragging,
@@ -28,7 +28,7 @@ export default function Rectangle({
 
   return (
     <div
-      data-testid="rectangle"
+      data-testid="circle"
       data-object-id={object.id}
       onPointerDown={handlePointerDown}
       style={{
@@ -39,6 +39,7 @@ export default function Rectangle({
         height: object.height,
         background: object.color,
         border: '2px solid rgba(0,0,0,0.2)',
+        borderRadius: '50%',
         boxSizing: 'border-box',
         zIndex: object.zIndex,
         cursor,

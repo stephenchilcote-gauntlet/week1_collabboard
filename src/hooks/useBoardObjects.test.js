@@ -4,6 +4,7 @@ import { useBoardObjects } from './useBoardObjects.js';
 
 const mockOnValue = vi.fn();
 const mockRef = vi.fn();
+const mockSet = vi.fn();
 
 vi.mock('../firebase/config.js', () => ({
   db: {},
@@ -13,7 +14,7 @@ vi.mock('../firebase/config.js', () => ({
 vi.mock('firebase/database', () => ({
   ref: (...args) => mockRef(...args),
   onValue: (...args) => mockOnValue(...args),
-  set: vi.fn(),
+  set: (...args) => mockSet(...args),
   update: vi.fn(),
   remove: vi.fn(),
 }));
@@ -22,6 +23,7 @@ describe('useBoardObjects', () => {
   beforeEach(() => {
     mockOnValue.mockReset();
     mockRef.mockReset();
+    mockSet.mockReset();
   });
 
   it('subscribes to the board objects path and marks loaded', () => {
@@ -49,5 +51,20 @@ describe('useBoardObjects', () => {
 
     const { result } = renderHook(() => useBoardObjects());
     expect(result.current.objects).toEqual({ obj: { id: 'obj' } });
+  });
+
+  it('createCircle writes circle data', async () => {
+    mockOnValue.mockImplementation((_ref, callback) => {
+      callback({ val: () => ({}) });
+      return vi.fn();
+    });
+    mockSet.mockResolvedValue();
+
+    const { result } = renderHook(() => useBoardObjects({ user: { uid: 'me' } }));
+    await result.current.createCircle(0, 0, 1, 800, 600, 1);
+
+    expect(mockSet).toHaveBeenCalled();
+    const payload = mockSet.mock.calls[0][1];
+    expect(payload.type).toBe('circle');
   });
 });

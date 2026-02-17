@@ -17,6 +17,7 @@ export default function ColorPalette({ selectedObject, onChangeColor }) {
         background: '#f3f3f3',
         borderRadius: 12,
       }}
+      data-testid="color-palette"
     >
       {OBJECT_COLORS.map((color) => {
         const isActive = color === selectedObject.color;

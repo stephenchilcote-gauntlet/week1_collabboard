@@ -13,6 +13,7 @@ function renderNote(props = {}) {
     onDragStart: vi.fn(),
     onEditStateChange: vi.fn(),
     zoom: 1,
+    interactionMode: 'idle',
   };
   const merged = { ...defaults, ...props };
   return { ...render(<StickyNote {...merged} />), ...merged };
@@ -327,7 +328,7 @@ describe('StickyNote', () => {
 
     const note = getByTestId('sticky-note');
     fireEvent.pointerDown(note, { clientX: 0, clientY: 0, pointerId: 1 });
-    expect(onSelect).toHaveBeenCalledWith('note1');
+    expect(onSelect).toHaveBeenCalledWith('note1', expect.any(Object));
   });
 
   describe('locked by another user', () => {

@@ -17,7 +17,10 @@ import { useSelection } from './hooks/useSelection.js';
 import { useCursors } from './hooks/useCursors.js';
 import { usePresence } from './hooks/usePresence.js';
 import { useInteractionState } from './hooks/useInteractionState.js';
-import { boardToScreen } from './utils/coordinates.js';
+import { useClipboard } from './hooks/useClipboard.js';
+import { useUndoRedo } from './hooks/useUndoRedo.js';
+import { useRotation } from './hooks/useRotation.js';
+import { boardToScreen, rectFromPoints } from './utils/coordinates.js';
 
 const BoardShell = ({ user }) => {
   const [errorMessage, setErrorMessage] = useState('');
@@ -31,6 +34,12 @@ const BoardShell = ({ user }) => {
     updateObject,
     createStickyNote,
     createRectangle,
+    createCircle,
+    createLine,
+    createText,
+    createFrame,
+    createConnector,
+    createObject,
     deleteObject,
     restoreObject,
     localCreatedIds,
@@ -42,6 +51,14 @@ const BoardShell = ({ user }) => {
   const { cursors, updateCursor } = useCursors(user);
   const { presenceList } = usePresence(user);
   const selection = useSelection(objects, user, presenceList);
+  const clipboard = useClipboard();
+  const undoRedo = useUndoRedo({ deleteObject, restoreObject, updateObject });
+  const rotation = useRotation();
+  const [connectorMode, setConnectorMode] = useState(false);
+  const [connectorFromId, setConnectorFromId] = useState(null);
+  const [marqueeBounds, setMarqueeBounds] = useState(null);
+  const [marqueeStart, setMarqueeStart] = useState(null);
+  const rotationStateRef = useRef(null);
   const {
     handleDragStart: dragStart,
     handleDragMove,
@@ -65,13 +82,65 @@ const BoardShell = ({ user }) => {
   const clearSelection = selection.clearSelection;
   useEffect(() => {
     const handleKeyDown = (event) => {
+      if (interactionState.mode === 'editing') {
+        return;
+      }
       if (event.key === 'Escape') {
+        if (connectorMode) {
+          setConnectorMode(false);
+          setConnectorFromId(null);
+        }
         clearSelection();
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') {
+        event.preventDefault();
+        const selected = Array.from(selection.selectedIds).map((id) => objects[id]).filter(Boolean);
+        clipboard.copy(selected);
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v') {
+        event.preventDefault();
+        const pasted = clipboard.paste();
+        pasted.forEach((obj) => {
+          createObject(obj).then((created) => {
+            undoRedo.push({ type: 'create', object: created });
+          });
+        });
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
+        event.preventDefault();
+        const selected = Array.from(selection.selectedIds).map((id) => objects[id]).filter(Boolean);
+        const duplicated = clipboard.duplicate(selected);
+        duplicated.forEach((obj) => {
+          createObject(obj).then((created) => {
+            undoRedo.push({ type: 'create', object: created });
+          });
+        });
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        if (event.shiftKey) {
+          undoRedo.redo();
+        } else {
+          undoRedo.undo();
+        }
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') {
+        event.preventDefault();
+        undoRedo.redo();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [clearSelection]);
+  }, [
+    clearSelection,
+    clipboard,
+    connectorMode,
+    createObject,
+    interactionState.mode,
+    objects,
+    selection,
+    undoRedo,
+  ]);
 
   const [undoToast, setUndoToast] = useState(null);
   const undoTimerRef = useRef(null);
@@ -85,11 +154,13 @@ const BoardShell = ({ user }) => {
   const handleUndo = useCallback(() => {
     if (!undoToast) return;
     clearTimeout(undoTimerRef.current);
-    restoreObject(undoToast.id, undoToast.data).catch(() => {
+    restoreObject(undoToast.id, undoToast.data).then(() => {
+      undoRedo.push({ type: 'create', object: undoToast.data });
+    }).catch(() => {
       setErrorMessage('Failed to undo deletion.');
     });
     setUndoToast(null);
-  }, [undoToast, restoreObject]);
+  }, [undoToast, restoreObject, undoRedo]);
 
   const sortedZIndex = useMemo(() => {
     return Object.values(objects ?? {}).reduce((max, object) => (
@@ -121,7 +192,9 @@ const BoardShell = ({ user }) => {
       viewport.viewportWidth,
       viewport.viewportHeight,
       sortedZIndex + 1,
-    ).catch(() => {
+    ).then((sticky) => {
+      undoRedo.push({ type: 'create', object: sticky });
+    }).catch(() => {
       setErrorMessage('Failed to create sticky note.');
     });
   };
@@ -134,9 +207,100 @@ const BoardShell = ({ user }) => {
       viewport.viewportWidth,
       viewport.viewportHeight,
       sortedZIndex + 1,
-    ).catch(() => {
+    ).then((rectangle) => {
+      undoRedo.push({ type: 'create', object: rectangle });
+    }).catch(() => {
       setErrorMessage('Failed to create rectangle.');
     });
+  };
+
+  const handleCreateCircle = () => {
+    createCircle(
+      viewport.panX,
+      viewport.panY,
+      viewport.zoom,
+      viewport.viewportWidth,
+      viewport.viewportHeight,
+      sortedZIndex + 1,
+    ).then((circle) => {
+      undoRedo.push({ type: 'create', object: circle });
+    }).catch(() => {
+      setErrorMessage('Failed to create circle.');
+    });
+  };
+
+  const handleCreateLine = () => {
+    createLine(
+      viewport.panX,
+      viewport.panY,
+      viewport.zoom,
+      viewport.viewportWidth,
+      viewport.viewportHeight,
+      sortedZIndex + 1,
+    ).then((line) => {
+      undoRedo.push({ type: 'create', object: line });
+    }).catch(() => {
+      setErrorMessage('Failed to create line.');
+    });
+  };
+
+  const handleCreateText = () => {
+    createText(
+      viewport.panX,
+      viewport.panY,
+      viewport.zoom,
+      viewport.viewportWidth,
+      viewport.viewportHeight,
+      sortedZIndex + 1,
+    ).then((text) => {
+      undoRedo.push({ type: 'create', object: text });
+    }).catch(() => {
+      setErrorMessage('Failed to create text.');
+    });
+  };
+
+  const handleCreateFrame = () => {
+    createFrame(
+      viewport.panX,
+      viewport.panY,
+      viewport.zoom,
+      viewport.viewportWidth,
+      viewport.viewportHeight,
+      (sortedZIndex ?? 0) - 1,
+    ).then((frame) => {
+      undoRedo.push({ type: 'create', object: frame });
+    }).catch(() => {
+      setErrorMessage('Failed to create frame.');
+    });
+  };
+
+  const handleEnterConnectorMode = () => {
+    setConnectorMode((prev) => !prev);
+    setConnectorFromId(null);
+  };
+
+  const handleConnectorCandidate = (objectId) => {
+    if (!connectorMode) {
+      return;
+    }
+    if (!connectorFromId) {
+      setConnectorFromId(objectId);
+      return;
+    }
+    if (connectorFromId === objectId) {
+      return;
+    }
+    createConnector(connectorFromId, objectId, 'line', sortedZIndex + 1)
+      .then((connector) => {
+        undoRedo.push({ type: 'create', object: connector });
+      })
+      .catch(() => {
+        setErrorMessage('Failed to create connector.');
+      })
+      .finally(() => {
+        setConnectorFromId(null);
+        setConnectorMode(false);
+      });
   };
 
   const handleDeleteSelected = (objectId) => {
@@ -147,30 +311,149 @@ const BoardShell = ({ user }) => {
     deleteObject(objectId).then(() => {
       if (savedData) {
         setUndoToast({ id: objectId, data: savedData, type: savedData.type ?? 'object' });
+        undoRedo.push({ type: 'delete', object: savedData });
       }
     }).catch(() => {
       setErrorMessage('Failed to delete object.');
     });
   };
 
-  const handleUpdateObject = (objectId, updates) => {
+  const handleUpdateObject = (objectId, updates, recordUndo = true) => {
+    if (!objects[objectId]) {
+      return;
+    }
+    if (recordUndo) {
+      undoRedo.push({
+        type: 'update',
+        objectId,
+        before: objects[objectId],
+        after: { ...objects[objectId], ...updates },
+      });
+    }
     updateObject(objectId, updates).catch(() => {
       setErrorMessage('Failed to update object.');
     });
   };
 
+  const handleUpdateObjectNoUndo = useCallback((objectId, updates) => {
+    if (!objects[objectId]) {
+      return;
+    }
+    updateObject(objectId, updates).catch(() => {
+      setErrorMessage('Failed to update object.');
+    });
+  }, [objects, updateObject]);
+
   const handleDragStart = (object, containerX, containerY) => {
-    dragStart(object, containerX, containerY);
+    const selectedObjects = selection.selectedIds.size > 1
+      ? Array.from(selection.selectedIds).map((id) => objects[id]).filter(Boolean)
+      : null;
+    dragStart(object, containerX, containerY, selectedObjects);
     handleUpdateObject(object.id, { zIndex: sortedZIndex + 1 });
+    if (selectedObjects) {
+      selectedObjects.forEach((item) => {
+        undoRedo.push({
+          type: 'update',
+          objectId: item.id,
+          before: { x: item.x, y: item.y, x1: item.x1, y1: item.y1, x2: item.x2, y2: item.y2 },
+          after: { x: item.x, y: item.y, x1: item.x1, y1: item.y1, x2: item.x2, y2: item.y2 },
+        });
+      });
+    }
   };
 
   const handleResizeStartWithZ = (object, handlePosition, containerX, containerY) => {
-    resizeStart(object, handlePosition, containerX, containerY);
+    const selectionBounds = selection.getSelectionBounds?.();
+    const groupItems = selection.selectedIds.size > 1
+      ? Array.from(selection.selectedIds).map((id) => objects[id]).filter(Boolean)
+      : null;
+    resizeStart(object, handlePosition, containerX, containerY, {
+      keepAspect: object.type === 'circle',
+      groupBounds: groupItems ? selectionBounds : null,
+      groupItems,
+    });
     handleUpdateObject(object.id, { zIndex: sortedZIndex + 1 });
+    if (groupItems) {
+      groupItems.forEach((item) => {
+        undoRedo.push({
+          type: 'update',
+          objectId: item.id,
+          before: { x: item.x, y: item.y, width: item.width, height: item.height },
+          after: { x: item.x, y: item.y, width: item.width, height: item.height },
+        });
+      });
+    }
   };
 
   const handleEditStateChange = (objectId, isEditing) => {
     interactionState.setMode(isEditing ? 'editing' : 'idle', objectId);
+  };
+
+  const handleRotationStart = (object, containerX, containerY) => {
+    const center = {
+      x: object.x + (object.width ?? 0) / 2,
+      y: object.y + (object.height ?? 0) / 2,
+    };
+    const pointer = {
+      x: containerX / viewport.zoom - viewport.panX,
+      y: containerY / viewport.zoom - viewport.panY,
+    };
+    rotation.startRotation(center, pointer, object.rotation ?? 0);
+    rotationStateRef.current = { id: object.id };
+    undoRedo.push({
+      type: 'update',
+      objectId: object.id,
+      before: { rotation: object.rotation ?? 0 },
+      after: { rotation: object.rotation ?? 0 },
+    });
+  };
+
+  const handleRotationMove = (containerX, containerY) => {
+    if (!rotationStateRef.current) {
+      return;
+    }
+    const pointer = {
+      x: containerX / viewport.zoom - viewport.panX,
+      y: containerY / viewport.zoom - viewport.panY,
+    };
+    const angle = rotation.updateRotation(pointer);
+    const normalized = rotation.normalizeAngle(angle);
+    handleUpdateObjectNoUndo(rotationStateRef.current.id, { rotation: normalized });
+  };
+
+  const handleRotationEnd = () => {
+    rotationStateRef.current = null;
+  };
+
+  const handleMarqueeStart = (containerX, containerY) => {
+    const start = {
+      x: containerX / viewport.zoom - viewport.panX,
+      y: containerY / viewport.zoom - viewport.panY,
+    };
+    setMarqueeStart(start);
+    setMarqueeBounds({ x: start.x, y: start.y, width: 0, height: 0 });
+    interactionState.setMode('selecting');
+  };
+
+  const handleMarqueeMove = (containerX, containerY) => {
+    if (!marqueeStart) {
+      return;
+    }
+    const current = {
+      x: containerX / viewport.zoom - viewport.panX,
+      y: containerY / viewport.zoom - viewport.panY,
+    };
+    setMarqueeBounds(rectFromPoints(marqueeStart, current));
+  };
+
+  const handleMarqueeEnd = () => {
+    if (marqueeBounds) {
+      const ids = selection.getIntersectingIds(objects, marqueeBounds);
+      selection.setSelection(ids);
+    }
+    setMarqueeBounds(null);
+    setMarqueeStart(null);
+    interactionState.setMode('idle');
   };
 
   return (
@@ -195,6 +478,11 @@ const BoardShell = ({ user }) => {
       <Toolbar
         onCreateSticky={handleCreateSticky}
         onCreateRectangle={handleCreateRectangle}
+        onCreateCircle={handleCreateCircle}
+        onCreateLine={handleCreateLine}
+        onCreateText={handleCreateText}
+        onCreateFrame={handleCreateFrame}
+        onEnterConnectorMode={handleEnterConnectorMode}
         onDeleteSelected={handleDeleteSelected}
         selectedId={selection.selectedId}
         interactionMode={interactionState.mode}
@@ -233,9 +521,11 @@ const BoardShell = ({ user }) => {
         user={user}
         localCreatedIds={localCreatedIds}
         selectedId={selection.selectedId}
+        selectedIds={selection.selectedIds}
         draggingId={interactionState.mode === 'dragging' ? interactionState.activeObjectId : null}
         lockedObjectIds={selection.lockedObjectIds}
         onSelect={selection.select}
+        onToggleSelect={selection.toggleSelection}
         onClearSelection={handleClearSelection}
         onUpdateObject={handleUpdateObject}
         onEditingChange={handleEditStateChange}
@@ -245,6 +535,17 @@ const BoardShell = ({ user }) => {
         onResizeStart={handleResizeStartWithZ}
         onResizeMove={handleResizeMove}
         onResizeEnd={handleResizeEnd}
+        onConnectorCandidate={handleConnectorCandidate}
+        connectorMode={connectorMode}
+        connectorFromId={connectorFromId}
+        selectionBounds={selection.getSelectionBounds?.()}
+        marqueeBounds={marqueeBounds}
+        onMarqueeStart={handleMarqueeStart}
+        onMarqueeMove={handleMarqueeMove}
+        onMarqueeEnd={handleMarqueeEnd}
+        onRotationStart={handleRotationStart}
+        onRotationMove={handleRotationMove}
+        onRotationEnd={handleRotationEnd}
         onCursorMove={(x, y) => updateCursor(x, y, viewport.panX, viewport.panY, viewport.zoom)}
       />
       <CursorOverlay cursors={cursors} viewport={viewport} currentUid={user.uid} />

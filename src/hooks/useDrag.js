@@ -10,6 +10,8 @@ export const useDrag = (viewport, updateObject, selectObject, onDragStateChange)
   const startPointer = useRef({ x: 0, y: 0 });
   const updateObjectRef = useRef(updateObject);
   updateObjectRef.current = updateObject;
+  const multiUpdateRef = useRef(null);
+  const lineDragRef = useRef(null);
   const throttledUpdate = useRef(throttle((...args) => updateObjectRef.current(...args), 50));
   const viewportRef = useRef(viewport);
   viewportRef.current = viewport;
@@ -19,13 +21,42 @@ export const useDrag = (viewport, updateObject, selectObject, onDragStateChange)
     onDragStateChange?.(nextId);
   }, [onDragStateChange]);
 
-  const handleDragStart = useCallback((object, containerX, containerY) => {
+  const handleDragStart = useCallback((object, containerX, containerY, selectedObjects = null) => {
     updateDraggingId(object.id);
     startPointer.current = { x: containerX, y: containerY };
     const vp = viewportRef.current;
     const point = screenToBoard(containerX, containerY, vp.panX, vp.panY, vp.zoom);
-    dragAnchor.current = { x: point.x - object.x, y: point.y - object.y };
-    selectObject?.(object.id);
+    if (typeof object.x1 === 'number' && typeof object.y1 === 'number') {
+      lineDragRef.current = {
+        startPoint: point,
+        x1: object.x1,
+        y1: object.y1,
+        x2: object.x2,
+        y2: object.y2,
+      };
+    } else {
+      lineDragRef.current = null;
+      dragAnchor.current = { x: point.x - object.x, y: point.y - object.y };
+    }
+    if (selectedObjects) {
+      multiUpdateRef.current = {
+        startPoint: point,
+        items: selectedObjects.map((item) => ({
+          id: item.id,
+          x: item.x,
+          y: item.y,
+          x1: item.x1,
+          y1: item.y1,
+          x2: item.x2,
+          y2: item.y2,
+        })),
+      };
+    } else {
+      multiUpdateRef.current = null;
+    }
+    if (!selectedObjects) {
+      selectObject?.(object.id);
+    }
   }, [selectObject, updateDraggingId]);
 
   const handleDragMove = useCallback((containerX, containerY) => {
@@ -34,10 +65,50 @@ export const useDrag = (viewport, updateObject, selectObject, onDragStateChange)
     }
     const vp = viewportRef.current;
     const point = screenToBoard(containerX, containerY, vp.panX, vp.panY, vp.zoom);
+    if (multiUpdateRef.current) {
+      const dx = point.x - multiUpdateRef.current.startPoint.x;
+      const dy = point.y - multiUpdateRef.current.startPoint.y;
+      multiUpdateRef.current.items.forEach((item) => {
+        if (typeof item.x1 === 'number' && typeof item.y1 === 'number') {
+          throttledUpdate.current(item.id, {
+            x1: item.x1 + dx,
+            y1: item.y1 + dy,
+            x2: item.x2 + dx,
+            y2: item.y2 + dy,
+          });
+        } else {
+          throttledUpdate.current(item.id, {
+            x: item.x + dx,
+            y: item.y + dy,
+          });
+        }
+      });
+      return;
+    }
+    if (lineDragRef.current) {
+      const dx = point.x - lineDragRef.current.startPoint.x;
+      const dy = point.y - lineDragRef.current.startPoint.y;
+      throttledUpdate.current(draggingId, {
+        x1: lineDragRef.current.x1 + dx,
+        y1: lineDragRef.current.y1 + dy,
+        x2: lineDragRef.current.x2 + dx,
+        y2: lineDragRef.current.y2 + dy,
+      });
+      return;
+    }
     const next = {
       x: point.x - dragAnchor.current.x,
       y: point.y - dragAnchor.current.y,
     };
+    if (multiUpdateRef.current) {
+      multiUpdateRef.current.offsets.forEach((item) => {
+        throttledUpdate.current(item.id, {
+          x: next.x + item.dx,
+          y: next.y + item.dy,
+        });
+      });
+      return;
+    }
     throttledUpdate.current(draggingId, next);
   }, [draggingId]);
 
@@ -51,6 +122,8 @@ export const useDrag = (viewport, updateObject, selectObject, onDragStateChange)
       throttledUpdate.current.flush?.();
     }
     updateDraggingId(null);
+    multiUpdateRef.current = null;
+    lineDragRef.current = null;
   }, [draggingId, updateDraggingId]);
 
   return {

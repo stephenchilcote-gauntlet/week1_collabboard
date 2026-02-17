@@ -12,6 +12,7 @@ export default function StickyNote({
   onEditStateChange,
   zoom,
   remoteEntryPhase,
+  interactionMode,
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftText, setDraftText] = useState(object.text ?? '');
@@ -57,12 +58,15 @@ export default function StickyNote({
     if (lockedByOther) {
       return;
     }
-    onSelect(object.id);
+    onSelect?.(object.id, event);
     if (isEditing) {
       return;
     }
+    if (interactionMode === 'connecting') {
+      return;
+    }
     if (!isSelected) {
-      onDragStart(object, event);
+      onDragStart?.(object, event);
       return;
     }
     const startX = event.clientX;
@@ -149,6 +153,8 @@ export default function StickyNote({
         transition: 'opacity 300ms ease, box-shadow 300ms ease, filter 300ms ease',
         boxShadow: isHighlighted ? '0 0 0 4px rgba(59, 130, 246, 0.35)' : 'none',
         overflow: 'hidden',
+        transform: object.rotation ? `rotate(${object.rotation}deg)` : undefined,
+        transformOrigin: 'center',
       }}
     >
       {isEditing ? (
