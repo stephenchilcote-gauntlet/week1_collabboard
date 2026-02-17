@@ -338,6 +338,7 @@ export default function Board({
         height: '100%',
         background: '#f0f0f0',
         touchAction: 'none',
+        userSelect: 'none',
         cursor: activeResizeCursor || undefined,
       }}
       onPointerDown={handlePointerDown}
