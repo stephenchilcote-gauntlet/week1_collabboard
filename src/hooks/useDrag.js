@@ -8,7 +8,11 @@ export const useDrag = (viewport, updateObject, selectObject, onDragStateChange)
   const [draggingId, setDraggingId] = useState(null);
   const dragAnchor = useRef({ x: 0, y: 0 });
   const startPointer = useRef({ x: 0, y: 0 });
-  const throttledUpdate = useRef(throttle(updateObject, 50));
+  const updateObjectRef = useRef(updateObject);
+  updateObjectRef.current = updateObject;
+  const throttledUpdate = useRef(throttle((...args) => updateObjectRef.current(...args), 50));
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
 
   const updateDraggingId = useCallback((nextId) => {
     setDraggingId(nextId);
@@ -18,22 +22,24 @@ export const useDrag = (viewport, updateObject, selectObject, onDragStateChange)
   const handleDragStart = useCallback((object, containerX, containerY) => {
     updateDraggingId(object.id);
     startPointer.current = { x: containerX, y: containerY };
-    const point = screenToBoard(containerX, containerY, viewport.panX, viewport.panY, viewport.zoom);
+    const vp = viewportRef.current;
+    const point = screenToBoard(containerX, containerY, vp.panX, vp.panY, vp.zoom);
     dragAnchor.current = { x: point.x - object.x, y: point.y - object.y };
     selectObject?.(object.id);
-  }, [selectObject, updateDraggingId, viewport]);
+  }, [selectObject, updateDraggingId]);
 
   const handleDragMove = useCallback((containerX, containerY) => {
     if (!draggingId) {
       return;
     }
-    const point = screenToBoard(containerX, containerY, viewport.panX, viewport.panY, viewport.zoom);
+    const vp = viewportRef.current;
+    const point = screenToBoard(containerX, containerY, vp.panX, vp.panY, vp.zoom);
     const next = {
       x: point.x - dragAnchor.current.x,
       y: point.y - dragAnchor.current.y,
     };
     throttledUpdate.current(draggingId, next);
-  }, [draggingId, viewport]);
+  }, [draggingId]);
 
   const handleDragEnd = useCallback((containerX, containerY) => {
     if (!draggingId) {

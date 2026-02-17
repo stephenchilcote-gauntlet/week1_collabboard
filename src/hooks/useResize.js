@@ -48,7 +48,11 @@ export const useResize = (viewport, updateObject, onResizeStateChange) => {
   const initialBounds = useRef(null);
   const handleRef = useRef(null);
   const startPointer = useRef({ x: 0, y: 0 });
-  const throttledUpdate = useRef(throttle(updateObject, 50));
+  const updateObjectRef = useRef(updateObject);
+  updateObjectRef.current = updateObject;
+  const throttledUpdate = useRef(throttle((...args) => updateObjectRef.current(...args), 50));
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
 
   const updateResizingId = useCallback((nextId) => {
     setResizingId(nextId);
@@ -66,13 +70,14 @@ export const useResize = (viewport, updateObject, onResizeStateChange) => {
     if (!resizingId || !initialBounds.current || !handleRef.current) {
       return;
     }
-    const start = screenToBoard(startPointer.current.x, startPointer.current.y, viewport.panX, viewport.panY, viewport.zoom);
-    const current = screenToBoard(containerX, containerY, viewport.panX, viewport.panY, viewport.zoom);
+    const vp = viewportRef.current;
+    const start = screenToBoard(startPointer.current.x, startPointer.current.y, vp.panX, vp.panY, vp.zoom);
+    const current = screenToBoard(containerX, containerY, vp.panX, vp.panY, vp.zoom);
     const dx = current.x - start.x;
     const dy = current.y - start.y;
     const next = clampResize(initialBounds.current, handleRef.current, dx, dy);
     throttledUpdate.current(resizingId, next);
-  }, [resizingId, viewport]);
+  }, [resizingId]);
 
   const handleResizeEnd = useCallback(() => {
     if (!resizingId) {

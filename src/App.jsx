@@ -233,6 +233,7 @@ const BoardShell = ({ user }) => {
         user={user}
         localCreatedIds={localCreatedIds}
         selectedId={selection.selectedId}
+        draggingId={interactionState.mode === 'dragging' ? interactionState.activeObjectId : null}
         lockedObjectIds={selection.lockedObjectIds}
         onSelect={selection.select}
         onClearSelection={handleClearSelection}

@@ -4,6 +4,7 @@ import { isClickThreshold } from '../hooks/useDrag.js';
 export default function StickyNote({
   object,
   isSelected,
+  isDragging,
   lockedByOther,
   onSelect,
   onUpdate,
@@ -44,7 +45,7 @@ export default function StickyNote({
 
   useEffect(() => cleanupPendingDrag, []);
 
-  const handleDoubleClick = (event) => {
+  const handleEnterEdit = (event) => {
     if (lockedByOther) {
       return;
     }
@@ -117,7 +118,7 @@ export default function StickyNote({
     event.stopPropagation();
   };
 
-  const cursor = lockedByOther ? 'not-allowed' : isEditing ? 'text' : isSelected ? 'grabbing' : 'grab';
+  const cursor = lockedByOther ? 'not-allowed' : isEditing ? 'text' : isDragging ? 'grabbing' : 'grab';
   const isEntering = remoteEntryPhase === 'initial';
   const isHighlighted = remoteEntryPhase === 'active';
 
@@ -126,8 +127,8 @@ export default function StickyNote({
       data-testid="sticky-note"
       data-object-id={object.id}
       onPointerDown={handlePointerDown}
-      onDoubleClick={handleDoubleClick}
-      onClick={handleDoubleClick}
+      onDoubleClick={handleEnterEdit}
+      onClick={handleEnterEdit}
       style={{
         position: 'absolute',
         left: object.x,

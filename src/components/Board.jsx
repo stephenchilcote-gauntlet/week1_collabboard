@@ -27,6 +27,7 @@ export default function Board({
   user,
   localCreatedIds,
   selectedId,
+  draggingId,
   lockedObjectIds,
   onSelect,
   onClearSelection,
@@ -340,7 +341,7 @@ export default function Board({
         background: '#f0f0f0',
         touchAction: 'none',
         userSelect: 'none',
-        cursor: activeResizeCursor || (isPanning ? 'grabbing' : 'grab'),
+        cursor: activeResizeCursor || (draggingId ? 'grabbing' : isPanning ? 'grabbing' : 'default'),
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -385,6 +386,7 @@ export default function Board({
                 <StickyNote
                   object={object}
                   isSelected={object.id === selectedId}
+                  isDragging={object.id === draggingId}
                   lockedByOther={lockedByOther}
                   onSelect={onSelect}
                   onUpdate={handleObjectUpdate}
@@ -397,6 +399,7 @@ export default function Board({
                 <Rectangle
                   object={object}
                   isSelected={object.id === selectedId}
+                  isDragging={object.id === draggingId}
                   lockedByOther={lockedByOther}
                   onSelect={onSelect}
                   onUpdate={handleObjectUpdate}

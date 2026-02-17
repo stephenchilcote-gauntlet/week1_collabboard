@@ -1,6 +1,7 @@
 export default function Rectangle({
   object,
   isSelected,
+  isDragging,
   lockedByOther,
   onSelect,
   onUpdate,
@@ -19,7 +20,7 @@ export default function Rectangle({
 
   const isEntering = remoteEntryPhase === 'initial';
   const isHighlighted = remoteEntryPhase === 'active';
-  const cursor = lockedByOther ? 'not-allowed' : isSelected ? 'grabbing' : 'grab';
+  const cursor = lockedByOther ? 'not-allowed' : isDragging ? 'grabbing' : 'grab';
 
   return (
     <div
