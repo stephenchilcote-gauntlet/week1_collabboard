@@ -6,6 +6,7 @@ import Line from './Line.jsx';
 import TextElement from './TextElement.jsx';
 import Frame from './Frame.jsx';
 import Connector from './Connector.jsx';
+import EmbedObject from './EmbedObject.jsx';
 import SelectionOverlay from './SelectionOverlay.jsx';
 import SelectionMarquee from './SelectionMarquee.jsx';
 import { boardToScreen } from '../utils/coordinates.js';
@@ -217,6 +218,7 @@ export default function Board({
         text: 'text',
         frame: 'frame',
         connector: 'connector',
+        embed: 'embed',
       };
       const label = labelLookup[object.type] ?? 'object';
       pushNotification(`${actor} ${action} a ${label}`);
@@ -550,6 +552,19 @@ export default function Board({
                   onSelect={handleObjectSelect}
                 />
               )}
+              {object.type === 'embed' && (
+                <EmbedObject
+                  object={object}
+                  isSelected={selectionSet.has(object.id)}
+                  isDragging={object.id === draggingId}
+                  lockedByOther={lockedByOther}
+                  onSelect={handleObjectSelect}
+                  onDragStart={handleObjectDragStart}
+                  zoom={zoom}
+                  remoteEntryPhase={remoteEntryPhase}
+                  interactionMode={connectorMode ? 'connecting' : 'idle'}
+                />
+              )}
               {lockedByOther && (
                 <div
                   data-testid="remote-selection-label"
@@ -605,7 +620,7 @@ export default function Board({
         {selectionSet.size <= 1 && selectedObject && selectedObject.type !== 'line' && selectedObject.type !== 'connector' && (
           <SelectionOverlay
             object={selectionBounds ?? selectedObject}
-            isResizable={selectedObject.type === 'rectangle' || selectedObject.type === 'sticky' || selectedObject.type === 'circle' || selectedObject.type === 'text' || selectedObject.type === 'frame'}
+            isResizable={selectedObject.type === 'rectangle' || selectedObject.type === 'sticky' || selectedObject.type === 'circle' || selectedObject.type === 'text' || selectedObject.type === 'frame' || selectedObject.type === 'embed'}
             zoom={zoom}
             showRotation={selectedObject.type !== 'line' && selectedObject.type !== 'connector'}
           />
