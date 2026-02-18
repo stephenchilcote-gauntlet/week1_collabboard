@@ -161,6 +161,13 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
       });
     }
 
+    const traceContext = {
+      sessionId: convId,
+      userId: userId || 'anonymous',
+      userName: userName || null,
+      boardName,
+    };
+
     // Optimistically add the user message to display
     setDisplayMessages((prev) => [...prev, { role: 'user', text: message }]);
 
@@ -215,7 +222,7 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
 
     try {
       const apiHistory = historyRef.current.filter((m) => m.role !== 'tool');
-      const result = await runAgent(message, operations, setProgress, viewportContext, apiHistory, handleToolCall, handleStream);
+      const result = await runAgent(message, operations, setProgress, viewportContext, apiHistory, handleToolCall, handleStream, traceContext);
       const replyText = result.text || 'Done!';
 
       // Clear streaming state

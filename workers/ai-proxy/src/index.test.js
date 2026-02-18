@@ -1,7 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const mockGenerationEnd = vi.fn();
+const mockGeneration = vi.fn();
+const mockTrace = vi.fn();
+const mockFlush = vi.fn();
+
+vi.mock('langfuse', () => ({
+  Langfuse: vi.fn(function LangfuseMock() {
+    return { trace: mockTrace, flushAsync: mockFlush };
+  }),
+}));
+
 import worker from './index.js';
 
-const env = { ANTHROPIC_API_KEY: 'sk-ant-test-key' };
+const env = {
+  ANTHROPIC_API_KEY: 'sk-ant-test-key',
+  LANGFUSE_SECRET_KEY: 'sk-lf-test',
+  LANGFUSE_PUBLIC_KEY: 'pk-lf-test',
+};
 
 const makeRequest = (method, body) =>
   new Request('https://worker.test/', {
@@ -10,27 +26,35 @@ const makeRequest = (method, body) =>
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
 
+const makeMockCtx = () => ({ waitUntil: vi.fn() });
+
 describe('ai-proxy worker', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    mockTrace.mockClear();
+    mockFlush.mockClear();
+    mockGeneration.mockClear();
+    mockGenerationEnd.mockClear();
+    mockTrace.mockReturnValue({ generation: mockGeneration });
+    mockGeneration.mockReturnValue({ end: mockGenerationEnd });
   });
 
   it('responds to OPTIONS with CORS headers (preflight)', async () => {
-    const res = await worker.fetch(new Request('https://worker.test/', { method: 'OPTIONS' }), env);
+    const res = await worker.fetch(new Request('https://worker.test/', { method: 'OPTIONS' }), env, makeMockCtx());
     expect(res.status).toBe(200);
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
     expect(res.headers.get('Access-Control-Allow-Methods')).toContain('POST');
   });
 
   it('rejects non-POST methods with 405', async () => {
-    const res = await worker.fetch(new Request('https://worker.test/'), env);
+    const res = await worker.fetch(new Request('https://worker.test/'), env, makeMockCtx());
     expect(res.status).toBe(405);
     const data = await res.json();
     expect(data.error).toBe('Method not allowed');
   });
 
   it('returns 500 when ANTHROPIC_API_KEY is not set', async () => {
-    const res = await worker.fetch(makeRequest('POST', { model: 'test' }), {});
+    const res = await worker.fetch(makeRequest('POST', { model: 'test' }), {}, makeMockCtx());
     expect(res.status).toBe(500);
     const data = await res.json();
     expect(data.error).toContain('ANTHROPIC_API_KEY');
@@ -63,7 +87,7 @@ describe('ai-proxy worker', () => {
       messages: [{ role: 'user', content: 'Say hello' }],
     };
 
-    const res = await worker.fetch(makeRequest('POST', requestBody), env);
+    const res = await worker.fetch(makeRequest('POST', requestBody), env, makeMockCtx());
 
     expect(res.status).toBe(200);
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
@@ -88,7 +112,7 @@ describe('ai-proxy worker', () => {
       }))
     ));
 
-    const res = await worker.fetch(makeRequest('POST', { model: 'bad' }), env);
+    const res = await worker.fetch(makeRequest('POST', { model: 'bad' }), env, makeMockCtx());
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error.message).toBe('Invalid model');
@@ -101,7 +125,7 @@ describe('ai-proxy worker', () => {
       body: 'not json',
     });
 
-    const res = await worker.fetch(req, env);
+    const res = await worker.fetch(req, env, makeMockCtx());
     expect(res.status).toBe(500);
     const data = await res.json();
     expect(data.error).toBeTruthy();
@@ -109,11 +133,11 @@ describe('ai-proxy worker', () => {
 
   it('includes CORS headers on all responses', async () => {
     // 405 response
-    const res1 = await worker.fetch(new Request('https://worker.test/'), env);
+    const res1 = await worker.fetch(new Request('https://worker.test/'), env, makeMockCtx());
     expect(res1.headers.get('Access-Control-Allow-Origin')).toBe('*');
 
     // 500 response (no key)
-    const res2 = await worker.fetch(makeRequest('POST', {}), {});
+    const res2 = await worker.fetch(makeRequest('POST', {}), {}, makeMockCtx());
     expect(res2.headers.get('Access-Control-Allow-Origin')).toBe('*');
   });
 });

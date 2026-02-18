@@ -32,13 +32,16 @@ const buildRequestBody = (messages, systemPrompt) => ({
   stream: true,
 });
 
-const callProxyStream = async (messages, systemPrompt, onProgress, streamCallbacks) => {
+const callProxyStream = async (messages, systemPrompt, onProgress, streamCallbacks, traceContext) => {
   const body = JSON.stringify(buildRequestBody(messages, systemPrompt));
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
     const response = await fetch(AI_PROXY_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(traceContext ? { 'X-Trace-Context': JSON.stringify(traceContext) } : {}),
+      },
       body,
     });
 
@@ -60,7 +63,7 @@ const callProxyStream = async (messages, systemPrompt, onProgress, streamCallbac
 };
 
 // Non-streaming fallback for tests and simple cases
-const callProxy = async (messages, systemPrompt, onProgress) => {
+const callProxy = async (messages, systemPrompt, onProgress, traceContext) => {
   const reqBody = buildRequestBody(messages, systemPrompt);
   delete reqBody.stream;
   delete reqBody.thinking;
@@ -70,7 +73,10 @@ const callProxy = async (messages, systemPrompt, onProgress) => {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
     const response = await fetch(AI_PROXY_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(traceContext ? { 'X-Trace-Context': JSON.stringify(traceContext) } : {}),
+      },
       body,
     });
 
@@ -104,7 +110,7 @@ export const extractToolUseBlocks = (response) => {
   return response.content.filter((block) => block.type === 'tool_use');
 };
 
-export const runAgent = async (userMessage, operations, onProgress, viewportContext, conversationHistory = [], onToolCall, onStream) => {
+export const runAgent = async (userMessage, operations, onProgress, viewportContext, conversationHistory = [], onToolCall, onStream, traceContext) => {
   const messages = [...conversationHistory, { role: 'user', content: userMessage }];
   const systemPrompt = buildSystemPrompt(viewportContext);
   let textReply = '';
@@ -122,9 +128,9 @@ export const runAgent = async (userMessage, operations, onProgress, viewportCont
         onToolEnd: () => onStream({ type: 'toolEnd' }),
         onStop: () => onStream({ type: 'done' }),
       };
-      response = await callProxyStream(messages, systemPrompt, onProgress, streamCallbacks);
+      response = await callProxyStream(messages, systemPrompt, onProgress, streamCallbacks, traceContext);
     } else {
-      response = await callProxy(messages, systemPrompt, onProgress);
+      response = await callProxy(messages, systemPrompt, onProgress, traceContext);
     }
 
     console.log(`[AI Agent] Round ${round}, stop_reason: ${response.stop_reason}, content blocks: ${response.content?.length}`);

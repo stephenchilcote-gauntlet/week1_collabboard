@@ -4,3 +4,5 @@ compatibility_date = "2024-01-01"
 
 # Set your Anthropic key as a secret (never in this file):
 #   npx wrangler secret put ANTHROPIC_API_KEY
+#   npx wrangler secret put LANGFUSE_SECRET_KEY
+#   npx wrangler secret put LANGFUSE_PUBLIC_KEY

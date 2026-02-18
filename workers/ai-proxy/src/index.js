@@ -1,14 +1,16 @@
 // Cloudflare Worker — AI proxy for CollabBoard
 // Forwards requests to Anthropic API without exposing the key to the client.
 
+import { Langfuse } from 'langfuse';
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Trace-Context',
 };
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: CORS_HEADERS });
     }
@@ -28,9 +30,58 @@ export default {
       });
     }
 
+    if (!env.LANGFUSE_SECRET_KEY || !env.LANGFUSE_PUBLIC_KEY) {
+      return new Response(JSON.stringify({ error: 'Langfuse keys not configured' }), {
+        status: 500,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const langfuse = new Langfuse({
+      secretKey: env.LANGFUSE_SECRET_KEY,
+      publicKey: env.LANGFUSE_PUBLIC_KEY,
+      baseUrl: env.LANGFUSE_BASE_URL || 'https://cloud.langfuse.com',
+    });
+
+    const waitUntil = ctx?.waitUntil?.bind(ctx);
+
     try {
       const body = await request.json();
       const isStreaming = body.stream === true;
+
+      // Parse trace context from client header
+      let traceContext = {};
+      const traceHeader = request.headers.get('X-Trace-Context');
+      if (traceHeader) {
+        try {
+          traceContext = JSON.parse(traceHeader);
+        } catch {
+          traceContext = {};
+        }
+      }
+
+      const trace = langfuse.trace({
+        name: 'ai-proxy-request',
+        sessionId: traceContext.sessionId || undefined,
+        userId: traceContext.userId || undefined,
+        metadata: {
+          userName: traceContext.userName || undefined,
+          boardName: traceContext.boardName || undefined,
+          streaming: isStreaming,
+        },
+      });
+
+      const generation = trace.generation({
+        name: 'anthropic-messages',
+        model: body.model || 'unknown',
+        input: {
+          messageCount: body.messages?.length || 0,
+          tools: body.tools?.map((tool) => tool.name) || [],
+        },
+        modelParameters: {
+          max_tokens: body.max_tokens,
+        },
+      });
 
       const headers = {
         'Content-Type': 'application/json',
@@ -38,7 +89,6 @@ export default {
         'anthropic-version': '2023-06-01',
       };
 
-      // Enable interleaved thinking for extended thinking with tool use
       if (body.thinking) {
         headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
       }
@@ -50,6 +100,13 @@ export default {
       });
 
       if (isStreaming) {
+        generation.end({
+          output: '(streaming response)',
+          statusMessage: `HTTP ${anthropicResponse.status}`,
+          level: anthropicResponse.status === 200 ? 'DEFAULT' : 'ERROR',
+        });
+        waitUntil?.(langfuse.flushAsync());
+
         return new Response(anthropicResponse.body, {
           status: anthropicResponse.status,
           headers: {
@@ -62,12 +119,36 @@ export default {
       }
 
       const data = await anthropicResponse.json();
+      const toolCalls = data.content
+        ? data.content.filter((block) => block.type === 'tool_use').map((block) => block.name)
+        : [];
+      const usage = data.usage
+        ? { input: data.usage.input_tokens, output: data.usage.output_tokens }
+        : undefined;
+
+      generation.end({
+        output: {
+          stop_reason: data.stop_reason,
+          tool_calls: toolCalls,
+        },
+        statusMessage: `HTTP ${anthropicResponse.status}`,
+        level: anthropicResponse.status === 200 ? 'DEFAULT' : 'ERROR',
+        ...(usage ? { usage } : {}),
+      });
+      waitUntil?.(langfuse.flushAsync());
 
       return new Response(JSON.stringify(data), {
         status: anthropicResponse.status,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       });
     } catch (error) {
+      langfuse.trace({
+        name: 'ai-proxy-error',
+        level: 'ERROR',
+        metadata: { error: error.message },
+      });
+      waitUntil?.(langfuse.flushAsync());
+
       return new Response(JSON.stringify({ error: error.message }), {
         status: 500,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },

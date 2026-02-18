@@ -181,4 +181,22 @@ describe('runAgent', () => {
     // MAX_TOOL_ROUNDS is 10, so we get 10 calls
     expect(mockFetch).toHaveBeenCalledTimes(10);
   });
+
+  it('forwards traceContext as X-Trace-Context header', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        stop_reason: 'end_turn',
+        content: [{ type: 'text', text: 'Done.' }],
+      }),
+    });
+
+    const ops = makeOps();
+    const traceContext = { sessionId: 'sess-1', userId: 'user-1', boardName: 'test-board' };
+    await runAgent('Test', ops, null, null, [], null, null, traceContext);
+
+    const fetchCall = mockFetch.mock.calls[0];
+    const headers = fetchCall[1].headers;
+    expect(headers['X-Trace-Context']).toBe(JSON.stringify(traceContext));
+  });
 });
