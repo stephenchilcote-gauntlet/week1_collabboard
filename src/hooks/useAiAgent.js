@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { get, limitToLast, onValue, orderByChild, push, query, ref, set, update } from 'firebase/database';
-import { db, BOARD_ID } from '../firebase/config.js';
+import { db } from '../firebase/config.js';
 import { runAgent } from '../ai/agent.js';
 import { screenToBoard } from '../utils/coordinates.js';
 
-const conversationsRef = () => ref(db, `boards/${BOARD_ID}/conversations`);
+const conversationsRef = (boardName) => ref(db, `boards/${boardName}/conversations`);
 
-const saveConversation = (convId, data) => {
-  const convRef = ref(db, `boards/${BOARD_ID}/conversations/${convId}`);
+const saveConversation = (boardName, convId, data) => {
+  const convRef = ref(db, `boards/${boardName}/conversations/${convId}`);
   return set(convRef, data);
 };
 
-const updateConversation = (convId, data) => {
-  const convRef = ref(db, `boards/${BOARD_ID}/conversations/${convId}`);
+const updateConversation = (boardName, convId, data) => {
+  const convRef = ref(db, `boards/${boardName}/conversations/${convId}`);
   return update(convRef, data);
 };
 
@@ -49,7 +49,7 @@ const summarizeToolCall = (name, input) => {
   return label;
 };
 
-export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, viewport, cursors, userId, userName }) => {
+export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, viewport, cursors, userId, userName, boardName }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(null);
   const [conversationId, setConversationId] = useState(null);
@@ -66,7 +66,7 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
 
   // Listen for conversation list from Firebase (most recent 50)
   useEffect(() => {
-    const q = query(conversationsRef(), orderByChild('updatedAt'), limitToLast(50));
+    const q = query(conversationsRef(boardName), orderByChild('updatedAt'), limitToLast(50));
     const unsub = onValue(q, (snapshot) => {
       const val = snapshot.val();
       if (!val) {
@@ -88,7 +88,7 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
       setConversationList(list);
     });
     return unsub;
-  }, []);
+  }, [boardName]);
 
   const startNewConversation = useCallback(() => {
     setConversationId(null);
@@ -97,7 +97,7 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
   }, []);
 
   const loadConversation = useCallback(async (convId) => {
-    const convRef = ref(db, `boards/${BOARD_ID}/conversations/${convId}`);
+    const convRef = ref(db, `boards/${boardName}/conversations/${convId}`);
     const snapshot = await get(convRef);
     const conv = snapshot.val();
     if (!conv) return;
@@ -105,7 +105,7 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
     historyRef.current = msgs;
     setConversationId(convId);
     setDisplayMessages(buildDisplayMessages(msgs));
-  }, []);
+  }, [boardName]);
 
   const submit = useCallback(async (message) => {
     setIsLoading(true);
@@ -148,15 +148,15 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
     // Create conversation in Firebase if this is the first message
     let convId = conversationId;
     if (!convId) {
-      const newRef = push(conversationsRef());
+      const newRef = push(conversationsRef(boardName));
       convId = newRef.key;
       setConversationId(convId);
-      await saveConversation(convId, {
+      await saveConversation(boardName, convId, {
         createdAt: Date.now(),
         updatedAt: Date.now(),
         createdBy: userId ?? null,
         createdByName: userName ?? null,
-        boardId: BOARD_ID,
+        boardId: boardName,
         messages: [],
       });
     }
@@ -237,7 +237,7 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
       setDisplayMessages(buildDisplayMessages(historyRef.current));
 
       // Persist to Firebase
-      await updateConversation(convId, {
+      await updateConversation(boardName, convId, {
         updatedAt: Date.now(),
         messages: historyRef.current,
       });
@@ -253,7 +253,7 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
       setIsLoading(false);
       setProgress(null);
     }
-  }, [createObject, updateObject, deleteObject, viewport, cursors, userId, userName, conversationId]);
+  }, [createObject, updateObject, deleteObject, viewport, cursors, userId, userName, conversationId, boardName]);
 
   return { submit, isLoading, progress, conversationId, startNewConversation, loadConversation, displayMessages, conversationList, streamingText, thinkingText, isThinking };
 };

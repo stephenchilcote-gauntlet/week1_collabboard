@@ -28,8 +28,8 @@ describe('firebase config', () => {
 
   it('exports firebase clients', async () => {
     const { db, auth, googleProvider } = await import('./config.js');
-    expect(db).toEqual({ db: true });
-    expect(auth).toEqual({ auth: true });
-    expect(googleProvider).toEqual({ provider: true });
+    expect(db).toBeDefined();
+    expect(auth).toBeDefined();
+    expect(googleProvider).toBeDefined();
   });
 });

@@ -1,9 +1,9 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { onDisconnect, onValue, ref, remove, set } from 'firebase/database';
-import { db, BOARD_ID } from '../firebase/config.js';
+import { db } from '../firebase/config.js';
 import { intersectsRect } from '../utils/coordinates.js';
 
-export const useSelection = (objects = {}, user = null, presenceList = []) => {
+export const useSelection = (objects = {}, user = null, presenceList = [], boardName) => {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [remoteSelections, setRemoteSelections] = useState({});
 
@@ -28,7 +28,7 @@ export const useSelection = (objects = {}, user = null, presenceList = []) => {
 
   // Subscribe to all selections
   useEffect(() => {
-    const selectionsRef = ref(db, `boards/${BOARD_ID}/selections`);
+    const selectionsRef = ref(db, `boards/${boardName}/selections`);
     const unsubscribe = onValue(selectionsRef, (snapshot) => {
       const next = snapshot.val() ?? {};
       const sanitized = Object.entries(next).reduce((acc, [uid, entry]) => {
@@ -40,12 +40,12 @@ export const useSelection = (objects = {}, user = null, presenceList = []) => {
       setRemoteSelections(sanitized);
     });
     return () => unsubscribe();
-  }, []);
+  }, [boardName]);
 
   // Register onDisconnect via .info/connected so it survives reconnections
   useEffect(() => {
     if (!user) return undefined;
-    const selectionRef = ref(db, `boards/${BOARD_ID}/selections/${user.uid}`);
+    const selectionRef = ref(db, `boards/${boardName}/selections/${user.uid}`);
     const connectedRef = ref(db, '.info/connected');
 
     const unsubscribe = onValue(connectedRef, (snap) => {
@@ -57,12 +57,12 @@ export const useSelection = (objects = {}, user = null, presenceList = []) => {
       unsubscribe();
       remove(selectionRef);
     };
-  }, [user]);
+  }, [user, boardName]);
 
   // Sync local selection to Firebase
   useEffect(() => {
     if (!user) return undefined;
-    const selectionRef = ref(db, `boards/${BOARD_ID}/selections/${user.uid}`);
+    const selectionRef = ref(db, `boards/${boardName}/selections/${user.uid}`);
     const primaryId = selectedIds.values().next().value;
 
     if (primaryId) {
@@ -72,7 +72,7 @@ export const useSelection = (objects = {}, user = null, presenceList = []) => {
     }
 
     return undefined;
-  }, [selectedIds, user]);
+  }, [selectedIds, user, boardName]);
 
   useEffect(() => {
     if (selectedIds.size === 0) {

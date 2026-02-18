@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { onDisconnect, onValue, ref, remove, set, update } from 'firebase/database';
-import { auth, db, BOARD_ID } from '../firebase/config.js';
+import { auth, db } from '../firebase/config.js';
 
 const HEARTBEAT_INTERVAL_MS = 5000;
 const PRESENCE_TTL_MS = 15000;
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 const ACTIVITY_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart'];
 
-export const usePresence = (user) => {
+export const usePresence = (user, boardName) => {
   const [presenceList, setPresenceList] = useState([]);
   const heartbeatRef = useRef(null);
   const lastActivityRef = useRef(Date.now());
@@ -35,9 +35,9 @@ export const usePresence = (user) => {
       return undefined;
     }
 
-    const presenceRef = ref(db, `boards/${BOARD_ID}/presence/${user.uid}`);
+    const presenceRef = ref(db, `boards/${boardName}/presence/${user.uid}`);
     presenceRefRef.current = presenceRef;
-    const listRef = ref(db, `boards/${BOARD_ID}/presence`);
+    const listRef = ref(db, `boards/${boardName}/presence`);
     const connectedRef = ref(db, '.info/connected');
 
     const unregisterHeartbeat = () => {
@@ -119,7 +119,7 @@ export const usePresence = (user) => {
         remove(presenceRef);
       }
     };
-  }, [user, goOnline]);
+  }, [user, goOnline, boardName]);
 
   return useMemo(() => ({ presenceList }), [presenceList]);
 };

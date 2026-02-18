@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { ref, remove } from 'firebase/database';
-import { auth, googleProvider, db, BOARD_ID } from './firebase/config.js';
+import { auth, googleProvider, db } from './firebase/config.js';
 import Board from './components/Board.jsx';
 import ConnectionStatus from './components/ConnectionStatus.jsx';
 import CursorOverlay from './components/CursorOverlay.jsx';
@@ -25,9 +25,10 @@ import { useAiAgent } from './hooks/useAiAgent.js';
 import { boardToScreen, rectFromPoints, containsRect, getObjectBounds } from './utils/coordinates.js';
 import { orbitAroundCenter } from './hooks/multiTransformUtils.js';
 
-const BoardShell = ({ user }) => {
+const BoardShell = ({ user, boardName, onNavigateHome }) => {
   const [errorMessage, setErrorMessage] = useState('');
   const [signOutHovered, setSignOutHovered] = useState(false);
+  const [homeHovered, setHomeHovered] = useState(false);
   const boardRef = useRef(null);
   const viewport = useViewport(boardRef);
   const interactionState = useInteractionState();
@@ -48,16 +49,17 @@ const BoardShell = ({ user }) => {
     localCreatedIds,
   } = useBoardObjects({
     user,
+    boardName,
     draggingId: interactionState.mode === 'dragging' ? interactionState.activeObjectId : null,
     editingId: interactionState.mode === 'editing' ? interactionState.activeObjectId : null,
   });
-  const { cursors, updateCursor } = useCursors(user);
-  const { presenceList } = usePresence(user);
-  const selection = useSelection(objects, user, presenceList);
+  const { cursors, updateCursor } = useCursors(user, boardName);
+  const { presenceList } = usePresence(user, boardName);
+  const selection = useSelection(objects, user, presenceList, boardName);
   const clipboard = useClipboard();
   const undoRedo = useUndoRedo({ deleteObject, restoreObject, updateObject });
   const rotation = useRotation();
-  const aiAgent = useAiAgent({ objects, createObject, updateObject, deleteObject, viewport, cursors, userId: user.uid, userName: user.displayName });
+  const aiAgent = useAiAgent({ objects, createObject, updateObject, deleteObject, viewport, cursors, userId: user.uid, userName: user.displayName, boardName });
   const [connectorMode, setConnectorMode] = useState(false);
   const [connectorFromId, setConnectorFromId] = useState(null);
   const [marqueeBounds, setMarqueeBounds] = useState(null);
@@ -173,8 +175,8 @@ const BoardShell = ({ user }) => {
   }, [objects]);
 
   const handleSignOut = async () => {
-    const cursorRef = ref(db, `boards/${BOARD_ID}/cursors/${user.uid}`);
-    const presenceRef = ref(db, `boards/${BOARD_ID}/presence/${user.uid}`);
+    const cursorRef = ref(db, `boards/${boardName}/cursors/${user.uid}`);
+    const presenceRef = ref(db, `boards/${boardName}/presence/${user.uid}`);
     try {
       await remove(cursorRef);
       await remove(presenceRef);
@@ -524,6 +526,19 @@ const BoardShell = ({ user }) => {
     <div style={{ width: '100vw', height: '100vh', overflow: 'hidden' }}>
       <ConnectionStatus />
       <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 100, display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <button
+          onClick={onNavigateHome}
+          onMouseEnter={() => setHomeHovered(true)}
+          onMouseLeave={() => setHomeHovered(false)}
+          style={{
+            padding: '4px 8px',
+            cursor: 'pointer',
+            background: homeHovered ? 'rgba(0,0,0,0.08)' : 'transparent',
+            borderRadius: 8,
+            transition: 'background 0.15s',
+          }}
+        >← Boards</button>
+        <span style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>{boardName}</span>
         <span>{user.displayName}</span>
         <button
           onClick={handleSignOut}
@@ -800,7 +815,7 @@ const getFirebaseAuthTroubleshooting = () => (
   + 'then restart the dev server.'
 );
 
-export default function App() {
+export default function App({ boardName, onNavigateHome }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [signInError, setSignInError] = useState('');
@@ -856,5 +871,5 @@ export default function App() {
     );
   }
 
-  return <BoardShell user={user} />;
+  return <BoardShell user={user} boardName={boardName} onNavigateHome={onNavigateHome} />;
 }

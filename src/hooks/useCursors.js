@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { onDisconnect, onValue, ref, set, update } from 'firebase/database';
-import { auth, db, BOARD_ID } from '../firebase/config.js';
+import { auth, db } from '../firebase/config.js';
 import { screenToBoard } from '../utils/coordinates.js';
 import { throttle } from '../utils/throttle.js';
 
 const CURSOR_WRITE_INTERVAL = 50;
 
-export const useCursors = (user) => {
+export const useCursors = (user, boardName) => {
   const [cursors, setCursors] = useState({});
   const throttledRef = useRef(null);
 
@@ -15,8 +15,8 @@ export const useCursors = (user) => {
       return undefined;
     }
 
-    const cursorsRef = ref(db, `boards/${BOARD_ID}/cursors`);
-    const userCursorRef = ref(db, `boards/${BOARD_ID}/cursors/${user.uid}`);
+    const cursorsRef = ref(db, `boards/${boardName}/cursors`);
+    const userCursorRef = ref(db, `boards/${boardName}/cursors/${user.uid}`);
 
     const unsubscribe = onValue(cursorsRef, (snapshot) => {
       const next = snapshot.val() ?? {};
@@ -55,7 +55,7 @@ export const useCursors = (user) => {
       }
       unsubscribe();
     };
-  }, [user]);
+  }, [user, boardName]);
 
   const updateCursor = useCallback((screenX, screenY, panX, panY, zoom) => {
     if (!user || !throttledRef.current) {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { onValue, ref, remove, set, update } from 'firebase/database';
-import { db, BOARD_ID } from '../firebase/config.js';
+import { db } from '../firebase/config.js';
 import {
   DEFAULT_RECTANGLE_COLOR,
   DEFAULT_STICKY_COLOR,
@@ -120,13 +120,13 @@ const createConnectorObject = ({ fromId, toId, style = 'line' }, user) => ({
   updatedByName: user?.displayName ?? null,
 });
 
-export const useBoardObjects = ({ user, draggingId = null, editingId = null } = {}) => {
+export const useBoardObjects = ({ user, boardName, draggingId = null, editingId = null } = {}) => {
   const [objects, setObjects] = useState({});
   const [objectsLoaded, setObjectsLoaded] = useState(false);
   const localCreatedIds = useRef(new Set());
 
   useEffect(() => {
-    const objectsRef = ref(db, `boards/${BOARD_ID}/objects`);
+    const objectsRef = ref(db, `boards/${boardName}/objects`);
     const unsubscribe = onValue(objectsRef, (snapshot) => {
       const next = snapshot.val() ?? {};
       setObjects(next);
@@ -134,17 +134,17 @@ export const useBoardObjects = ({ user, draggingId = null, editingId = null } = 
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [boardName]);
 
   const updateObject = useCallback((objectId, updates) => {
-    const objectRef = ref(db, `boards/${BOARD_ID}/objects/${objectId}`);
+    const objectRef = ref(db, `boards/${boardName}/objects/${objectId}`);
     return update(objectRef, {
       ...updates,
       updatedAt: Date.now(),
       updatedBy: user?.uid ?? null,
       updatedByName: user?.displayName ?? null,
     });
-  }, [user]);
+  }, [boardName, user]);
 
   const createStickyNote = useCallback((panX, panY, zoom, viewportWidth, viewportHeight, zIndex) => {
     const position = viewportCenter(panX, panY, zoom, viewportWidth, viewportHeight);
@@ -153,9 +153,9 @@ export const useBoardObjects = ({ user, draggingId = null, editingId = null } = 
       zIndex,
     };
     localCreatedIds.current.add(sticky.id);
-    const objectRef = ref(db, `boards/${BOARD_ID}/objects/${sticky.id}`);
+    const objectRef = ref(db, `boards/${boardName}/objects/${sticky.id}`);
     return set(objectRef, sticky).then(() => sticky);
-  }, [user]);
+  }, [boardName, user]);
 
   const createRectangle = useCallback((panX, panY, zoom, viewportWidth, viewportHeight, zIndex) => {
     const position = viewportCenter(panX, panY, zoom, viewportWidth, viewportHeight);
@@ -164,9 +164,9 @@ export const useBoardObjects = ({ user, draggingId = null, editingId = null } = 
       zIndex,
     };
     localCreatedIds.current.add(rectangle.id);
-    const objectRef = ref(db, `boards/${BOARD_ID}/objects/${rectangle.id}`);
+    const objectRef = ref(db, `boards/${boardName}/objects/${rectangle.id}`);
     return set(objectRef, rectangle).then(() => rectangle);
-  }, [user]);
+  }, [boardName, user]);
 
   const createCircle = useCallback((panX, panY, zoom, viewportWidth, viewportHeight, zIndex) => {
     const position = viewportCenter(panX, panY, zoom, viewportWidth, viewportHeight);
@@ -175,9 +175,9 @@ export const useBoardObjects = ({ user, draggingId = null, editingId = null } = 
       zIndex,
     };
     localCreatedIds.current.add(circle.id);
-    const objectRef = ref(db, `boards/${BOARD_ID}/objects/${circle.id}`);
+    const objectRef = ref(db, `boards/${boardName}/objects/${circle.id}`);
     return set(objectRef, circle).then(() => circle);
-  }, [user]);
+  }, [boardName, user]);
 
   const createLine = useCallback((panX, panY, zoom, viewportWidth, viewportHeight, zIndex) => {
     const position = viewportCenter(panX, panY, zoom, viewportWidth, viewportHeight);
@@ -186,9 +186,9 @@ export const useBoardObjects = ({ user, draggingId = null, editingId = null } = 
       zIndex,
     };
     localCreatedIds.current.add(line.id);
-    const objectRef = ref(db, `boards/${BOARD_ID}/objects/${line.id}`);
+    const objectRef = ref(db, `boards/${boardName}/objects/${line.id}`);
     return set(objectRef, line).then(() => line);
-  }, [user]);
+  }, [boardName, user]);
 
   const createText = useCallback((panX, panY, zoom, viewportWidth, viewportHeight, zIndex) => {
     const position = viewportCenter(panX, panY, zoom, viewportWidth, viewportHeight);
@@ -197,9 +197,9 @@ export const useBoardObjects = ({ user, draggingId = null, editingId = null } = 
       zIndex,
     };
     localCreatedIds.current.add(text.id);
-    const objectRef = ref(db, `boards/${BOARD_ID}/objects/${text.id}`);
+    const objectRef = ref(db, `boards/${boardName}/objects/${text.id}`);
     return set(objectRef, text).then(() => text);
-  }, [user]);
+  }, [boardName, user]);
 
   const createFrame = useCallback((panX, panY, zoom, viewportWidth, viewportHeight, zIndex) => {
     const position = viewportCenter(panX, panY, zoom, viewportWidth, viewportHeight);
@@ -208,9 +208,9 @@ export const useBoardObjects = ({ user, draggingId = null, editingId = null } = 
       zIndex,
     };
     localCreatedIds.current.add(frame.id);
-    const objectRef = ref(db, `boards/${BOARD_ID}/objects/${frame.id}`);
+    const objectRef = ref(db, `boards/${boardName}/objects/${frame.id}`);
     return set(objectRef, frame).then(() => frame);
-  }, [user]);
+  }, [boardName, user]);
 
   const createConnector = useCallback((fromId, toId, style = 'line', zIndex = 0) => {
     const connector = {
@@ -218,9 +218,9 @@ export const useBoardObjects = ({ user, draggingId = null, editingId = null } = 
       zIndex,
     };
     localCreatedIds.current.add(connector.id);
-    const objectRef = ref(db, `boards/${BOARD_ID}/objects/${connector.id}`);
+    const objectRef = ref(db, `boards/${boardName}/objects/${connector.id}`);
     return set(objectRef, connector).then(() => connector);
-  }, [user]);
+  }, [boardName, user]);
 
   const createObject = useCallback((objectData) => {
     const id = objectData.id ?? generateId();
@@ -234,19 +234,19 @@ export const useBoardObjects = ({ user, draggingId = null, editingId = null } = 
       updatedByName: user?.displayName ?? null,
     };
     localCreatedIds.current.add(id);
-    const objectRef = ref(db, `boards/${BOARD_ID}/objects/${id}`);
+    const objectRef = ref(db, `boards/${boardName}/objects/${id}`);
     return set(objectRef, object).then(() => object);
-  }, [user]);
+  }, [boardName, user]);
 
   const deleteObject = useCallback((objectId) => {
-    const objectRef = ref(db, `boards/${BOARD_ID}/objects/${objectId}`);
+    const objectRef = ref(db, `boards/${boardName}/objects/${objectId}`);
     return remove(objectRef);
-  }, []);
+  }, [boardName]);
 
   const restoreObject = useCallback((objectId, objectData) => {
-    const objectRef = ref(db, `boards/${BOARD_ID}/objects/${objectId}`);
+    const objectRef = ref(db, `boards/${boardName}/objects/${objectId}`);
     return set(objectRef, objectData);
-  }, []);
+  }, [boardName]);
 
   const value = useMemo(() => ({
     objects,
