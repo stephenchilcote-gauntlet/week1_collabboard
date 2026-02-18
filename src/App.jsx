@@ -21,6 +21,7 @@ import { useClipboard } from './hooks/useClipboard.js';
 import { useUndoRedo } from './hooks/useUndoRedo.js';
 import { useRotation } from './hooks/useRotation.js';
 import { boardToScreen, rectFromPoints, containsRect, getObjectBounds } from './utils/coordinates.js';
+import { orbitAroundCenter } from './hooks/multiTransformUtils.js';
 
 const BoardShell = ({ user }) => {
   const [errorMessage, setErrorMessage] = useState('');
@@ -383,13 +384,18 @@ const BoardShell = ({ user }) => {
     const groupItems = selection.selectedIds.size > 1
       ? Array.from(selection.selectedIds).map((id) => objects[id]).filter(Boolean)
       : null;
-    resizeStart(object, handlePosition, containerX, containerY, {
-      keepAspect: object.type === 'circle' && ['nw', 'ne', 'sw', 'se'].includes(handlePosition),
-      symmetric: object.type === 'circle',
+    const target = groupItems && selectionBounds
+      ? { ...selectionBounds, id: '__multi__', type: 'group' }
+      : object;
+    resizeStart(target, handlePosition, containerX, containerY, {
+      keepAspect: !groupItems && object.type === 'circle' && ['nw', 'ne', 'sw', 'se'].includes(handlePosition),
+      symmetric: !groupItems && object.type === 'circle',
       groupBounds: groupItems ? selectionBounds : null,
       groupItems,
     });
-    handleUpdateObject(object.id, { zIndex: sortedZIndex + 1 });
+    if (object.id) {
+      handleUpdateObject(object.id, { zIndex: sortedZIndex + 1 });
+    }
     if (groupItems) {
       groupItems.forEach((item) => {
         undoRedo.push({
@@ -407,22 +413,52 @@ const BoardShell = ({ user }) => {
   };
 
   const handleRotationStart = (object, containerX, containerY) => {
-    const center = {
-      x: object.x + (object.width ?? 0) / 2,
-      y: object.y + (object.height ?? 0) / 2,
-    };
+    const isMulti = selection.selectedIds.size > 1;
     const pointer = {
       x: containerX / viewport.zoom - viewport.panX,
       y: containerY / viewport.zoom - viewport.panY,
     };
-    rotation.startRotation(center, pointer, object.rotation ?? 0);
-    rotationStateRef.current = { id: object.id };
-    undoRedo.push({
-      type: 'update',
-      objectId: object.id,
-      before: { rotation: object.rotation ?? 0 },
-      after: { rotation: object.rotation ?? 0 },
-    });
+    if (isMulti) {
+      const items = Array.from(selection.selectedIds).map((id) => objects[id]).filter(Boolean);
+      const bounds = selection.getSelectionBounds();
+      const center = {
+        x: bounds.x + bounds.width / 2,
+        y: bounds.y + bounds.height / 2,
+      };
+      rotation.startRotation(center, pointer, 0);
+      rotationStateRef.current = {
+        multi: true,
+        center,
+        items: items.map((it) => ({
+          id: it.id,
+          x: it.x,
+          y: it.y,
+          width: it.width ?? 0,
+          height: it.height ?? 0,
+        })),
+      };
+      items.forEach((it) => {
+        undoRedo.push({
+          type: 'update',
+          objectId: it.id,
+          before: { x: it.x, y: it.y },
+          after: { x: it.x, y: it.y },
+        });
+      });
+    } else {
+      const center = {
+        x: object.x + (object.width ?? 0) / 2,
+        y: object.y + (object.height ?? 0) / 2,
+      };
+      rotation.startRotation(center, pointer, object.rotation ?? 0);
+      rotationStateRef.current = { id: object.id };
+      undoRedo.push({
+        type: 'update',
+        objectId: object.id,
+        before: { rotation: object.rotation ?? 0 },
+        after: { rotation: object.rotation ?? 0 },
+      });
+    }
   };
 
   const handleRotationMove = (containerX, containerY) => {
@@ -434,8 +470,16 @@ const BoardShell = ({ user }) => {
       y: containerY / viewport.zoom - viewport.panY,
     };
     const angle = rotation.updateRotation(pointer);
-    const normalized = rotation.normalizeAngle(angle);
-    handleUpdateObjectNoUndo(rotationStateRef.current.id, { rotation: normalized });
+    if (rotationStateRef.current.multi) {
+      const { center, items } = rotationStateRef.current;
+      const results = orbitAroundCenter(items, center, angle);
+      results.forEach(({ id, x, y }) => {
+        handleUpdateObjectNoUndo(id, { x, y });
+      });
+    } else {
+      const normalized = rotation.normalizeAngle(angle);
+      handleUpdateObjectNoUndo(rotationStateRef.current.id, { rotation: normalized });
+    }
   };
 
   const handleRotationEnd = () => {
@@ -551,7 +595,7 @@ const BoardShell = ({ user }) => {
       )}
       {(() => {
         const selObj = selection.selectedId ? objects?.[selection.selectedId] : null;
-        if (!selObj) return null;
+        if (!selObj || selObj.type === 'embed') return null;
         const { panX, panY, zoom } = viewport;
         const bounds = getObjectBounds(selObj);
         const screenPos = boardToScreen(bounds.x, bounds.y + bounds.height, panX, panY, zoom);

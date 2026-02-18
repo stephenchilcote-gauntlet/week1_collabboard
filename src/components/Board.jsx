@@ -276,27 +276,29 @@ export default function Board({
     }
 
     const rotationHit = event.target.closest('[data-rotation-handle]');
-    if (rotationHit && selectedObject) {
+    if (rotationHit && (selectedObject || selectionSet.size > 1)) {
       const rect = resolvedRef.current?.getBoundingClientRect();
       if (!rect) {
         return;
       }
-      onRotationStart?.(selectedObject, event.clientX - rect.left, event.clientY - rect.top);
+      const target = selectedObject ?? {};
+      onRotationStart?.(target, event.clientX - rect.left, event.clientY - rect.top);
       capturePointer(event);
       event.preventDefault();
       return;
     }
 
     const handleHit = event.target.closest('[data-resize-handle]');
-    if (handleHit && selectedObject) {
+    if (handleHit && (selectedObject || selectionSet.size > 1)) {
       const rect = resolvedRef.current?.getBoundingClientRect();
       if (!rect) {
         return;
       }
       const handlePosition = handleHit.getAttribute('data-resize-handle');
       if (handlePosition) {
+        const target = selectedObject ?? {};
         onResizeStart?.(
-          selectedObject,
+          target,
           handlePosition,
           event.clientX - rect.left,
           event.clientY - rect.top,
@@ -592,7 +594,15 @@ export default function Board({
             or <strong>R</strong> for a rectangle
           </div>
         )}
-        {selectedObject && selectedObject.type !== 'line' && selectedObject.type !== 'connector' && (
+        {selectionSet.size > 1 && selectionBounds && (
+          <SelectionOverlay
+            object={selectionBounds}
+            isResizable
+            zoom={zoom}
+            showRotation
+          />
+        )}
+        {selectionSet.size <= 1 && selectedObject && selectedObject.type !== 'line' && selectedObject.type !== 'connector' && (
           <SelectionOverlay
             object={selectionBounds ?? selectedObject}
             isResizable={selectedObject.type === 'rectangle' || selectedObject.type === 'sticky' || selectedObject.type === 'circle' || selectedObject.type === 'text' || selectedObject.type === 'frame'}

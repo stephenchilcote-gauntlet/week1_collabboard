@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { screenToBoard } from '../utils/coordinates.js';
 import { throttle } from '../utils/throttle.js';
+import { scaleDistancesFromCenter } from './multiTransformUtils.js';
 
 const MIN_SIZE = 20;
 
@@ -118,23 +119,16 @@ export const useResize = (viewport, updateObject, onResizeStateChange) => {
     const current = screenToBoard(containerX, containerY, vp.panX, vp.panY, vp.zoom);
     const dx = current.x - start.x;
     const dy = current.y - start.y;
-    const next = clampResize(initialBounds.current, handleRef.current, dx, dy, { keepAspect: keepAspectRef.current, symmetric: symmetricRef.current });
     if (groupRef.current) {
       const { bounds, items } = groupRef.current;
-      const scaleX = next.width / bounds.width;
-      const scaleY = next.height / bounds.height;
-      items.forEach((item) => {
-        const offsetX = item.x - bounds.x;
-        const offsetY = item.y - bounds.y;
-        throttledUpdate.current(item.id, {
-          x: next.x + offsetX * scaleX,
-          y: next.y + offsetY * scaleY,
-          width: item.width * scaleX,
-          height: item.height * scaleY,
-        });
+      const next = clampResize(bounds, handleRef.current, dx, dy);
+      const results = scaleDistancesFromCenter(items, bounds, next);
+      results.forEach(({ id, x, y }) => {
+        updateObjectRef.current(id, { x, y });
       });
       return;
     }
+    const next = clampResize(initialBounds.current, handleRef.current, dx, dy, { keepAspect: keepAspectRef.current, symmetric: symmetricRef.current });
     throttledUpdate.current(resizingId, next);
   }, [resizingId]);
 
