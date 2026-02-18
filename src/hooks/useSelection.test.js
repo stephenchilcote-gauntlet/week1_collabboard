@@ -11,7 +11,6 @@ const mockOnDisconnect = vi.fn(() => ({ remove: vi.fn(), cancel: vi.fn() }));
 
 vi.mock('../firebase/config.js', () => ({
   db: {},
-  BOARD_ID: 'default',
 }));
 
 vi.mock('firebase/database', () => ({
@@ -37,13 +36,13 @@ describe('useSelection', () => {
   });
 
   it('starts with no selection', () => {
-    const { result } = renderHook(() => useSelection());
+    const { result } = renderHook(() => useSelection(undefined, undefined, undefined, 'test-board'));
     expect(result.current.selectedId).toBeNull();
     expect(result.current.selectedIds.size).toBe(0);
   });
 
   it('selects an object id', () => {
-    const { result } = renderHook(() => useSelection({ 'object-1': { id: 'object-1' } }));
+    const { result } = renderHook(() => useSelection({ 'object-1': { id: 'object-1' } }, undefined, undefined, 'test-board'));
 
     act(() => {
       result.current.select('object-1');
@@ -54,7 +53,7 @@ describe('useSelection', () => {
   });
 
   it('clears selection', () => {
-    const { result } = renderHook(() => useSelection({}));
+    const { result } = renderHook(() => useSelection({}, undefined, undefined, 'test-board'));
 
     act(() => {
       result.current.select('object-2');
@@ -69,7 +68,7 @@ describe('useSelection', () => {
   });
 
   it('clears selection when object is removed', () => {
-    const { result, rerender } = renderHook(({ objects }) => useSelection(objects), {
+    const { result, rerender } = renderHook(({ objects }) => useSelection(objects, undefined, undefined, 'test-board'), {
       initialProps: { objects: { obj: { id: 'obj' } } },
     });
 
@@ -82,7 +81,7 @@ describe('useSelection', () => {
   });
 
   it('returns empty lockedObjectIds when no user', () => {
-    const { result } = renderHook(() => useSelection({}, null));
+    const { result } = renderHook(() => useSelection({}, null, undefined, 'test-board'));
     expect(result.current.lockedObjectIds).toEqual({});
   });
 
@@ -102,7 +101,7 @@ describe('useSelection', () => {
       return vi.fn();
     });
 
-    const { result } = renderHook(() => useSelection({}, user, presenceList));
+    const { result } = renderHook(() => useSelection({}, user, presenceList, 'test-board'));
 
     // note-1 is locked by another present user
     expect(result.current.lockedObjectIds).toEqual({
@@ -124,14 +123,14 @@ describe('useSelection', () => {
       return vi.fn();
     });
 
-    const { result } = renderHook(() => useSelection({}, user, presenceList));
+    const { result } = renderHook(() => useSelection({}, user, presenceList, 'test-board'));
 
     expect(result.current.lockedObjectIds).toEqual({});
   });
 
   it('syncs selection to Firebase when user is present', () => {
     const user = { uid: 'me', displayName: 'Me' };
-    const { result } = renderHook(() => useSelection({}, user));
+    const { result } = renderHook(() => useSelection({}, user, undefined, 'test-board'));
 
     act(() => {
       result.current.select('note-1');
@@ -147,7 +146,7 @@ describe('useSelection', () => {
     const { result } = renderHook(() => useSelection({
       a: { id: 'a' },
       b: { id: 'b' },
-    }));
+    }, undefined, undefined, 'test-board'));
 
     act(() => {
       result.current.select('a');
@@ -185,7 +184,7 @@ describe('useSelection', () => {
       acc[item.id] = item;
       return acc;
     }, {});
-    const { result } = renderHook(() => useSelection(objects));
+    const { result } = renderHook(() => useSelection(objects, undefined, undefined, 'test-board'));
     const intersecting = result.current.getIntersectingIds(objects, marquee);
     const expected = items.filter((item) => (
       item.x <= marquee.x + marquee.width
@@ -198,7 +197,7 @@ describe('useSelection', () => {
 
   it('removes selection from Firebase on clearSelection', () => {
     const user = { uid: 'me', displayName: 'Me' };
-    const { result } = renderHook(() => useSelection({}, user));
+    const { result } = renderHook(() => useSelection({}, user, undefined, 'test-board'));
 
     act(() => {
       result.current.select('note-1');
@@ -225,7 +224,7 @@ describe('useSelection', () => {
       return vi.fn();
     });
 
-    const { result } = renderHook(() => useSelection({ 'note-1': { id: 'note-1' } }, user, presenceList));
+    const { result } = renderHook(() => useSelection({ 'note-1': { id: 'note-1' } }, user, presenceList, 'test-board'));
 
     act(() => {
       result.current.select('note-1');
@@ -250,7 +249,7 @@ describe('useSelection', () => {
       return vi.fn();
     });
 
-    const { result } = renderHook(() => useSelection({ 'note-1': { id: 'note-1' } }, user, presenceList));
+    const { result } = renderHook(() => useSelection({ 'note-1': { id: 'note-1' } }, user, presenceList, 'test-board'));
 
     act(() => {
       result.current.select('note-1');
@@ -281,7 +280,7 @@ describe('useSelection', () => {
       return vi.fn();
     });
 
-    renderHook(() => useSelection({}, user));
+    renderHook(() => useSelection({}, user, undefined, 'test-board'));
 
     expect(mockOnDisconnect).toHaveBeenCalled();
     expect(disconnectRemove).toHaveBeenCalled();
@@ -289,7 +288,7 @@ describe('useSelection', () => {
 
   it('getSelectionBounds includes rotation for single selected object', () => {
     const objects = { r1: { id: 'r1', x: 10, y: 20, width: 100, height: 50, rotation: 30 } };
-    const { result } = renderHook(() => useSelection(objects));
+    const { result } = renderHook(() => useSelection(objects, undefined, undefined, 'test-board'));
 
     act(() => {
       result.current.select('r1');
@@ -301,7 +300,7 @@ describe('useSelection', () => {
 
   it('getSelectionBounds includes zIndex for single selected object', () => {
     const objects = { r1: { id: 'r1', x: 0, y: 0, width: 50, height: 50, zIndex: 5 } };
-    const { result } = renderHook(() => useSelection(objects));
+    const { result } = renderHook(() => useSelection(objects, undefined, undefined, 'test-board'));
 
     act(() => {
       result.current.select('r1');
@@ -316,7 +315,7 @@ describe('useSelection', () => {
       a: { id: 'a', x: 0, y: 0, width: 50, height: 50, rotation: 45 },
       b: { id: 'b', x: 100, y: 100, width: 50, height: 50, rotation: 90 },
     };
-    const { result } = renderHook(() => useSelection(objects));
+    const { result } = renderHook(() => useSelection(objects, undefined, undefined, 'test-board'));
 
     act(() => {
       result.current.select('a');
@@ -344,7 +343,7 @@ describe('useSelection', () => {
     const { result } = renderHook(() => useSelection({
       locked: { id: 'locked' },
       open: { id: 'open' },
-    }, user, presenceList));
+    }, user, presenceList, 'test-board'));
 
     act(() => {
       result.current.setSelection(['locked', 'open']);

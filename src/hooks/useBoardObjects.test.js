@@ -8,7 +8,6 @@ const mockSet = vi.fn();
 
 vi.mock('../firebase/config.js', () => ({
   db: {},
-  BOARD_ID: 'default',
 }));
 
 vi.mock('firebase/database', () => ({
@@ -33,9 +32,9 @@ describe('useBoardObjects', () => {
       return unsubscribe;
     });
 
-    const { result, unmount } = renderHook(() => useBoardObjects());
+    const { result, unmount } = renderHook(() => useBoardObjects({ boardName: 'test-board' }));
 
-    expect(mockRef).toHaveBeenCalledWith({}, 'boards/default/objects');
+    expect(mockRef).toHaveBeenCalledWith({}, 'boards/test-board/objects');
     expect(result.current.objectsLoaded).toBe(true);
 
     unmount();
@@ -49,7 +48,7 @@ describe('useBoardObjects', () => {
       return unsubscribe;
     });
 
-    const { result } = renderHook(() => useBoardObjects());
+    const { result } = renderHook(() => useBoardObjects({ boardName: 'test-board' }));
     expect(result.current.objects).toEqual({ obj: { id: 'obj' } });
   });
 
@@ -60,7 +59,7 @@ describe('useBoardObjects', () => {
     });
     mockSet.mockResolvedValue();
 
-    const { result } = renderHook(() => useBoardObjects({ user: { uid: 'me' } }));
+    const { result } = renderHook(() => useBoardObjects({ user: { uid: 'me' }, boardName: 'test-board' }));
     await result.current.createCircle(0, 0, 1, 800, 600, 1);
 
     expect(mockSet).toHaveBeenCalled();

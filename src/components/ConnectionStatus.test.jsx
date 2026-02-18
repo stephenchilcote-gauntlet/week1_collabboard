@@ -7,7 +7,6 @@ const mockRef = vi.fn();
 
 vi.mock('../firebase/config.js', () => ({
   db: {},
-  BOARD_ID: 'default',
 }));
 
 vi.mock('firebase/database', () => ({

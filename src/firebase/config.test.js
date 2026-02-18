@@ -26,8 +26,10 @@ describe('firebase config', () => {
     });
   });
 
-  it('exports the default board id', async () => {
-    const { BOARD_ID } = await import('./config.js');
-    expect(BOARD_ID).toBe('default');
+  it('exports firebase clients', async () => {
+    const { db, auth, googleProvider } = await import('./config.js');
+    expect(db).toEqual({ db: true });
+    expect(auth).toEqual({ auth: true });
+    expect(googleProvider).toEqual({ provider: true });
   });
 });
