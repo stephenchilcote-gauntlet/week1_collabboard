@@ -43,7 +43,7 @@ describe('Line', () => {
   it('pointerDown on body selects and starts drag', () => {
     const { getByTestId, onSelect, onDragStart } = renderLine();
 
-    fireEvent.pointerDown(getByTestId('line-body'), { clientX: 10, clientY: 10 });
+    fireEvent.pointerDown(getByTestId('line-hit-area'), { clientX: 10, clientY: 10 });
 
     expect(onSelect).toHaveBeenCalledWith('line-1', expect.any(Object));
     expect(onDragStart).toHaveBeenCalled();
@@ -65,7 +65,7 @@ describe('Line', () => {
   it('lockedByOther blocks pointer events', () => {
     const { getByTestId, onSelect, onDragStart } = renderLine({ lockedByOther: true });
 
-    fireEvent.pointerDown(getByTestId('line-body'), { clientX: 10, clientY: 10 });
+    fireEvent.pointerDown(getByTestId('line-hit-area'), { clientX: 10, clientY: 10 });
 
     expect(onSelect).not.toHaveBeenCalled();
     expect(onDragStart).not.toHaveBeenCalled();

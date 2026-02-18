@@ -122,6 +122,7 @@ export default function Line({
         style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible', pointerEvents: 'none' }}
       >
         <line
+          data-testid="line-hit-area"
           x1={object.x1}
           y1={object.y1}
           x2={object.x2}
