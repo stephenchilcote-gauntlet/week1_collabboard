@@ -76,7 +76,11 @@ export default {
         model: body.model || 'unknown',
         input: {
           messageCount: body.messages?.length || 0,
-          tools: body.tools?.map((tool) => tool.name) || [],
+          messages: body.messages || [],
+          system: body.system || null,
+          tools: body.tools || [],
+          thinking: body.thinking || null,
+          stream: isStreaming,
         },
         modelParameters: {
           max_tokens: body.max_tokens,
@@ -130,6 +134,7 @@ export default {
         output: {
           stop_reason: data.stop_reason,
           tool_calls: toolCalls,
+          content: data.content || [],
         },
         statusMessage: `HTTP ${anthropicResponse.status}`,
         level: anthropicResponse.status === 200 ? 'DEFAULT' : 'ERROR',

@@ -89,6 +89,7 @@ describe('Langfuse auditing', () => {
       model: 'claude-sonnet-4-5-20250929',
       max_tokens: 4096,
       messages: [{ role: 'user', content: 'Hello' }],
+      system: 'You are helpful.',
       tools: [{ name: 'createObject' }, { name: 'deleteObject' }],
     }), env, ctx);
 
@@ -97,7 +98,9 @@ describe('Langfuse auditing', () => {
       model: 'claude-sonnet-4-5-20250929',
     }));
     const genCall = mockGeneration.mock.calls[0][0];
-    expect(genCall.input.tools).toEqual(['createObject', 'deleteObject']);
+    expect(genCall.input.tools).toEqual([{ name: 'createObject' }, { name: 'deleteObject' }]);
+    expect(genCall.input.messages).toEqual([{ role: 'user', content: 'Hello' }]);
+    expect(genCall.input.system).toBe('You are helpful.');
   });
 
   it('records token usage on generation end', async () => {
@@ -133,6 +136,10 @@ describe('Langfuse auditing', () => {
     const endCall = mockGenerationEnd.mock.calls[0][0];
     expect(endCall.output.tool_calls).toEqual(['createObject']);
     expect(endCall.output.stop_reason).toBe('tool_use');
+    expect(endCall.output.content).toEqual([
+      { type: 'text', text: 'Creating...' },
+      { type: 'tool_use', id: 'tu1', name: 'createObject', input: {} },
+    ]);
   });
 
   it('sets ERROR level when Anthropic returns non-200', async () => {
