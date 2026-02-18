@@ -8,6 +8,7 @@ import CursorOverlay from './components/CursorOverlay.jsx';
 import PresenceBar from './components/PresenceBar.jsx';
 import Toolbar from './components/Toolbar.jsx';
 import ColorPalette from './components/ColorPalette.jsx';
+import AiChat from './components/AiChat.jsx';
 import ErrorBanner from './components/ErrorBanner.jsx';
 import { useViewport } from './hooks/useViewport.js';
 import { useBoardObjects } from './hooks/useBoardObjects.js';
@@ -20,6 +21,7 @@ import { useInteractionState } from './hooks/useInteractionState.js';
 import { useClipboard } from './hooks/useClipboard.js';
 import { useUndoRedo } from './hooks/useUndoRedo.js';
 import { useRotation } from './hooks/useRotation.js';
+import { useAiAgent } from './hooks/useAiAgent.js';
 import { boardToScreen, rectFromPoints, containsRect, getObjectBounds } from './utils/coordinates.js';
 import { orbitAroundCenter } from './hooks/multiTransformUtils.js';
 
@@ -55,6 +57,7 @@ const BoardShell = ({ user }) => {
   const clipboard = useClipboard();
   const undoRedo = useUndoRedo({ deleteObject, restoreObject, updateObject });
   const rotation = useRotation();
+  const aiAgent = useAiAgent({ objects, createObject, updateObject, deleteObject, viewport, cursors, userId: user.uid, userName: user.displayName });
   const [connectorMode, setConnectorMode] = useState(false);
   const [connectorFromId, setConnectorFromId] = useState(null);
   const [marqueeBounds, setMarqueeBounds] = useState(null);
@@ -656,6 +659,19 @@ const BoardShell = ({ user }) => {
         onCursorMove={(x, y) => updateCursor(x, y, viewport.panX, viewport.panY, viewport.zoom)}
       />
       <CursorOverlay cursors={cursors} viewport={viewport} currentUid={user.uid} />
+      <AiChat
+        onSubmit={aiAgent.submit}
+        isLoading={aiAgent.isLoading}
+        progress={aiAgent.progress}
+        onNewConversation={aiAgent.startNewConversation}
+        messages={aiAgent.displayMessages}
+        conversationList={aiAgent.conversationList}
+        onLoadConversation={aiAgent.loadConversation}
+        activeConversationId={aiAgent.conversationId}
+        streamingText={aiAgent.streamingText}
+        thinkingText={aiAgent.thinkingText}
+        isThinking={aiAgent.isThinking}
+      />
       <div style={{
         position: 'fixed',
         bottom: 12,

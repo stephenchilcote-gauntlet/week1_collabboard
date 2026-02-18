@@ -3,7 +3,14 @@
     "boards": {
       "$boardId": {
         ".read": "auth != null",
-        ".write": "auth != null"
+        ".write": "auth != null",
+        "conversations": {
+          ".indexOn": ["updatedAt"],
+          "$conversationId": {
+            ".read": "auth != null",
+            ".write": "auth != null"
+          }
+        }
       }
     }
   }
