@@ -46,6 +46,7 @@ const BoardShell = ({ user, boardName, onNavigateHome }) => {
     createObject,
     deleteObject,
     restoreObject,
+    clearBoard,
     localCreatedIds,
   } = useBoardObjects({
     user,
@@ -59,7 +60,7 @@ const BoardShell = ({ user, boardName, onNavigateHome }) => {
   const clipboard = useClipboard();
   const undoRedo = useUndoRedo({ deleteObject, restoreObject, updateObject });
   const rotation = useRotation();
-  const aiAgent = useAiAgent({ objects, createObject, updateObject, deleteObject, viewport, cursors, userId: user.uid, userName: user.displayName, boardName });
+  const aiAgent = useAiAgent({ objects, createObject, updateObject, deleteObject, viewport, cursors, userId: user.uid, userName: user.displayName, boardName, selectedIds: selection.selectedIds });
   const [connectorMode, setConnectorMode] = useState(false);
   const [connectorFromId, setConnectorFromId] = useState(null);
   const [marqueeBounds, setMarqueeBounds] = useState(null);
@@ -72,7 +73,6 @@ const BoardShell = ({ user, boardName, onNavigateHome }) => {
   } = useDrag(
     viewport,
     updateObject,
-    selection.select,
     (dragId) => interactionState.setMode(dragId ? 'dragging' : 'idle', dragId),
   );
   const {
@@ -122,6 +122,11 @@ const BoardShell = ({ user, boardName, onNavigateHome }) => {
           });
         });
       }
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'Delete') {
+        event.preventDefault();
+        clearBoard();
+        return;
+      }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
         event.preventDefault();
         if (event.shiftKey) {
@@ -138,6 +143,7 @@ const BoardShell = ({ user, boardName, onNavigateHome }) => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
+    clearBoard,
     clearSelection,
     clipboard,
     connectorMode,
@@ -352,11 +358,7 @@ const BoardShell = ({ user, boardName, onNavigateHome }) => {
     });
   }, [objects, updateObject]);
 
-  const handleDragStart = (object, containerX, containerY) => {
-    let selectedObjects = selection.selectedIds.size > 1
-      ? Array.from(selection.selectedIds).map((id) => objects[id]).filter(Boolean)
-      : null;
-
+  const handleDragStart = (object, containerX, containerY, selectedObjects) => {
     if (object.type === 'frame' && !selectedObjects) {
       const frameBounds = getObjectBounds(object);
       const children = Object.values(objects ?? {}).filter((obj) => {
@@ -649,8 +651,7 @@ const BoardShell = ({ user, boardName, onNavigateHome }) => {
         selectedIds={selection.selectedIds}
         draggingId={interactionState.mode === 'dragging' ? interactionState.activeObjectId : null}
         lockedObjectIds={selection.lockedObjectIds}
-        onSelect={selection.select}
-        onToggleSelect={selection.toggleSelection}
+        onSetSelection={selection.setSelection}
         onClearSelection={handleClearSelection}
         onUpdateObject={handleUpdateObject}
         onEditingChange={handleEditStateChange}

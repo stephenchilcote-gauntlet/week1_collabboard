@@ -1,14 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { isClickThreshold } from '../hooks/useDrag.js';
 
 export default function StickyNote({
   object,
-  isSelected,
   isDragging,
   lockedByOther,
-  onSelect,
+  onObjectPointerDown,
   onUpdate,
-  onDragStart,
   onEditStateChange,
   zoom,
   remoteEntryPhase,
@@ -18,7 +15,6 @@ export default function StickyNote({
   const [draftText, setDraftText] = useState(object.text ?? '');
   const [isHovered, setIsHovered] = useState(false);
   const textRef = useRef(null);
-  const pendingDragRef = useRef(null);
 
   useEffect(() => {
     if (!isEditing) {
@@ -37,16 +33,6 @@ export default function StickyNote({
     }
   }, [isEditing, object.id, onEditStateChange]);
 
-  const cleanupPendingDrag = () => {
-    if (pendingDragRef.current) {
-      document.removeEventListener('pointermove', pendingDragRef.current.onMove);
-      document.removeEventListener('pointerup', pendingDragRef.current.onUp);
-      pendingDragRef.current = null;
-    }
-  };
-
-  useEffect(() => cleanupPendingDrag, []);
-
   const handleEnterEdit = (event) => {
     if (lockedByOther || interactionMode === 'connecting') {
       return;
@@ -59,38 +45,13 @@ export default function StickyNote({
     if (lockedByOther) {
       return;
     }
-    onSelect?.(object.id, event);
     if (isEditing) {
       return;
     }
     if (interactionMode === 'connecting') {
       return;
     }
-    if (!isSelected) {
-      onDragStart?.(object, event);
-      return;
-    }
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const origEvent = event.nativeEvent;
-
-    const onMove = (moveEvent) => {
-      const dx = moveEvent.clientX - startX;
-      const dy = moveEvent.clientY - startY;
-      if (!isClickThreshold(dx, dy)) {
-        cleanupPendingDrag();
-        onDragStart(object, origEvent);
-      }
-    };
-
-    const onUp = () => {
-      cleanupPendingDrag();
-    };
-
-    cleanupPendingDrag();
-    pendingDragRef.current = { onMove, onUp };
-    document.addEventListener('pointermove', onMove);
-    document.addEventListener('pointerup', onUp, { once: true });
+    onObjectPointerDown?.(object, event);
   };
 
   const handleBlur = () => {

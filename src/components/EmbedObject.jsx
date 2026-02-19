@@ -1,5 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
-import { isClickThreshold } from '../hooks/useDrag.js';
+import { useState } from 'react';
 
 const CSP_META = '<meta http-equiv="Content-Security-Policy" content="default-src \'unsafe-inline\'; connect-src \'none\'; img-src data:;">';
 const BASE_STYLE = '<style>*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,sans-serif;overflow:hidden}</style>';
@@ -11,56 +10,21 @@ export default function EmbedObject({
   isSelected,
   isDragging,
   lockedByOther,
-  onSelect,
-  onDragStart,
+  onObjectPointerDown,
   zoom,
   remoteEntryPhase,
   interactionMode,
 }) {
   const [isHovered, setIsHovered] = useState(false);
-  const pendingDragRef = useRef(null);
-
-  const cleanupPendingDrag = () => {
-    if (pendingDragRef.current) {
-      document.removeEventListener('pointermove', pendingDragRef.current.onMove);
-      document.removeEventListener('pointerup', pendingDragRef.current.onUp);
-      pendingDragRef.current = null;
-    }
-  };
-
-  useEffect(() => cleanupPendingDrag, []);
 
   const handlePointerDown = (event) => {
-    if (lockedByOther) return;
-    onSelect?.(object.id, event);
-    if (interactionMode === 'connecting') return;
-
-    if (!isSelected) {
-      onDragStart?.(object, event);
+    if (lockedByOther) {
       return;
     }
-
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const origEvent = event.nativeEvent;
-
-    const onMove = (moveEvent) => {
-      const dx = moveEvent.clientX - startX;
-      const dy = moveEvent.clientY - startY;
-      if (!isClickThreshold(dx, dy)) {
-        cleanupPendingDrag();
-        onDragStart(object, origEvent);
-      }
-    };
-
-    const onUp = () => {
-      cleanupPendingDrag();
-    };
-
-    cleanupPendingDrag();
-    pendingDragRef.current = { onMove, onUp };
-    document.addEventListener('pointermove', onMove);
-    document.addEventListener('pointerup', onUp, { once: true });
+    if (interactionMode === 'connecting') {
+      return;
+    }
+    onObjectPointerDown?.(object, event);
   };
 
   const cursor = lockedByOther

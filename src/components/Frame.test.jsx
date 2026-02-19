@@ -15,12 +15,10 @@ const defaultObject = {
 const renderFrame = (props = {}) => {
   const defaults = {
     object: defaultObject,
-    isSelected: false,
     isDragging: false,
     lockedByOther: false,
-    onSelect: vi.fn(),
+    onObjectPointerDown: vi.fn(),
     onUpdate: vi.fn(),
-    onDragStart: vi.fn(),
     onResizeStart: vi.fn(),
     zoom: 1,
     interactionMode: 'idle',
@@ -55,18 +53,12 @@ describe('Frame', () => {
     expect(onUpdate).toHaveBeenCalledWith('frame-1', { title: 'Updated' });
   });
 
-  it('pointerDown on border edge selects and starts drag', () => {
-    const { container, onSelect, onDragStart } = renderFrame();
+  it('pointerDown on title triggers onObjectPointerDown', () => {
+    const { container, onObjectPointerDown } = renderFrame();
 
-    // The border edge divs are the ones with pointerEvents: auto and cursor: grab
-    // Fire on the title bar which also handles pointer down
     const titleBar = container.querySelector('[data-testid="frame-title"]');
     fireEvent.pointerDown(titleBar, { clientX: 10, clientY: 10 });
-    expect(onSelect).toHaveBeenCalledWith('frame-1', expect.any(Object));
-
-    // Title bar uses deferred drag (waits for movement), so simulate movement
-    fireEvent(document, new PointerEvent('pointermove', { clientX: 100, clientY: 100 }));
-    expect(onDragStart).toHaveBeenCalled();
+    expect(onObjectPointerDown).toHaveBeenCalledWith(defaultObject, expect.any(Object));
   });
 
   it('renders with a lower z-index than standard objects', () => {
@@ -76,11 +68,10 @@ describe('Frame', () => {
   });
 
   it('lockedByOther blocks pointer events', () => {
-    const { getByTestId, onSelect, onDragStart } = renderFrame({ lockedByOther: true });
+    const { getByTestId, onObjectPointerDown } = renderFrame({ lockedByOther: true });
 
     fireEvent.pointerDown(getByTestId('frame-title'), { clientX: 10, clientY: 10 });
-    expect(onSelect).not.toHaveBeenCalled();
-    expect(onDragStart).not.toHaveBeenCalled();
+    expect(onObjectPointerDown).not.toHaveBeenCalled();
   });
 
   it('uses default colors when no color is set', () => {

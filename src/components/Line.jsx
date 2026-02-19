@@ -19,9 +19,9 @@ export default function Line({
   isSelected,
   isDragging,
   lockedByOther,
-  onSelect,
+  onEndpointSelect,
   onUpdate,
-  onDragStart,
+  onObjectPointerDown,
   zoom,
   remoteEntryPhase,
   interactionMode,
@@ -67,12 +67,10 @@ export default function Line({
     if (lockedByOther) {
       return;
     }
-    onSelect?.(object.id, event);
     if (interactionMode === 'connecting') {
       return;
     }
-    event.stopPropagation();
-    onDragStart?.(object, event);
+    onObjectPointerDown?.(object, event);
   };
 
   const handleEndpointPointerDown = (endpoint) => (event) => {
@@ -80,7 +78,7 @@ export default function Line({
       return;
     }
     event.stopPropagation();
-    onSelect?.(object.id, event);
+    onEndpointSelect?.(object.id, event);
     if (interactionMode === 'connecting') {
       return;
     }

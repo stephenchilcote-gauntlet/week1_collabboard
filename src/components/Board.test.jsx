@@ -27,7 +27,7 @@ const baseProps = {
   user: { uid: 'user-1', displayName: 'Alex' },
   localCreatedIds: new Set(),
   selectedId: null,
-  onSelect: vi.fn(),
+  onSetSelection: vi.fn(),
   onClearSelection: vi.fn(),
   onUpdateObject: vi.fn(),
   onEditingChange: vi.fn(),
@@ -245,5 +245,37 @@ describe('Board', () => {
     );
     const outer = getByTestId('board-outer');
     expect(outer.style.cursor).toBe('grabbing');
+  });
+
+  it('calls onSetSelection on shift-click (additive selection)', () => {
+    const onSetSelection = vi.fn();
+    const objects = {
+      note1: {
+        id: 'note1',
+        type: 'sticky',
+        x: 10,
+        y: 10,
+        width: 200,
+        height: 150,
+        text: 'Hello',
+        color: '#FFD700',
+        zIndex: 1,
+      },
+    };
+    const { getByTestId } = render(
+      <Board
+        {...baseProps}
+        objects={objects}
+        selectedIds={new Set()}
+        onSetSelection={onSetSelection}
+      />,
+    );
+
+    const note = getByTestId('sticky-note');
+    fireEvent.pointerDown(note, { button: 0, shiftKey: true, clientX: 50, clientY: 50, pointerId: 1 });
+
+    expect(onSetSelection).toHaveBeenCalledTimes(1);
+    expect(onSetSelection).toHaveBeenCalledWith(new Set(['note1']));
+    expect(baseProps.onSetSelection).not.toHaveBeenCalled();
   });
 });

@@ -7,11 +7,9 @@ const defaultObject = { id: 'rect1', x: 10, y: 20, width: 120, height: 80, color
 function renderRect(props = {}) {
   const defaults = {
     object: defaultObject,
-    isSelected: false,
     lockedByOther: false,
-    onSelect: vi.fn(),
+    onObjectPointerDown: vi.fn(),
     onUpdate: vi.fn(),
-    onDragStart: vi.fn(),
     onResizeStart: vi.fn(),
     zoom: 1,
     interactionMode: 'idle',
@@ -31,11 +29,10 @@ describe('Rectangle', () => {
 
   describe('locked by another user', () => {
     it('blocks pointerDown — no select or drag', () => {
-      const { getByTestId, onSelect, onDragStart } = renderRect({ lockedByOther: true });
+      const { getByTestId, onObjectPointerDown } = renderRect({ lockedByOther: true });
 
       fireEvent.pointerDown(getByTestId('rectangle'), { clientX: 0, clientY: 0, pointerId: 1 });
-      expect(onSelect).not.toHaveBeenCalled();
-      expect(onDragStart).not.toHaveBeenCalled();
+      expect(onObjectPointerDown).not.toHaveBeenCalled();
     });
 
     it('renders with reduced opacity and not-allowed cursor', () => {

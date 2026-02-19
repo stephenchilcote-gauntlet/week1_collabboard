@@ -37,8 +37,7 @@ describe('EmbedObject', () => {
         isSelected={false}
         isDragging={false}
         lockedByOther={false}
-        onSelect={vi.fn()}
-        onDragStart={vi.fn()}
+        onObjectPointerDown={vi.fn()}
         zoom={1}
       />,
     );
@@ -55,8 +54,7 @@ describe('EmbedObject', () => {
         isSelected={false}
         isDragging={false}
         lockedByOther={false}
-        onSelect={vi.fn()}
-        onDragStart={vi.fn()}
+        onObjectPointerDown={vi.fn()}
         zoom={1}
       />,
     );
@@ -75,8 +73,7 @@ describe('EmbedObject', () => {
         isSelected={false}
         isDragging={false}
         lockedByOther={false}
-        onSelect={vi.fn()}
-        onDragStart={vi.fn()}
+        onObjectPointerDown={vi.fn()}
         zoom={1}
       />,
     );
@@ -92,8 +89,7 @@ describe('EmbedObject', () => {
         isSelected={false}
         isDragging={false}
         lockedByOther={true}
-        onSelect={vi.fn()}
-        onDragStart={vi.fn()}
+        onObjectPointerDown={vi.fn()}
         zoom={1}
       />,
     );

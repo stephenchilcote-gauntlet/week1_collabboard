@@ -1,14 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { isClickThreshold } from '../hooks/useDrag.js';
 
 export default function Frame({
   object,
-  isSelected,
   isDragging,
   lockedByOther,
-  onSelect,
+  onObjectPointerDown,
   onUpdate,
-  onDragStart,
   onResizeStart,
   onEditStateChange,
   zoom,
@@ -20,7 +17,6 @@ export default function Frame({
   const [draftTitle, setDraftTitle] = useState(object.title ?? '');
   const inputRef = useRef(null);
   const prevEditingRef = useRef(false);
-  const pendingDragRef = useRef(null);
 
   useEffect(() => {
     if (!isEditing) {
@@ -39,56 +35,24 @@ export default function Frame({
     }
   }, [isEditing, object.id, onEditStateChange]);
 
-  const cleanupPendingDrag = () => {
-    if (pendingDragRef.current) {
-      document.removeEventListener('pointermove', pendingDragRef.current.onMove);
-      document.removeEventListener('pointerup', pendingDragRef.current.onUp);
-      pendingDragRef.current = null;
-    }
-  };
-
-  useEffect(() => cleanupPendingDrag, []);
-
   const handlePointerDown = (event) => {
     if (lockedByOther) {
       return;
     }
-    onSelect?.(object.id, event);
     if (interactionMode === 'connecting' || isEditing) {
       return;
     }
-    onDragStart?.(object, event);
+    onObjectPointerDown?.(object, event);
   };
 
   const handleTitlePointerDown = (event) => {
     if (lockedByOther) {
       return;
     }
-    onSelect?.(object.id, event);
     if (interactionMode === 'connecting' || isEditing) {
       return;
     }
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const origEvent = event.nativeEvent;
-
-    const onMove = (moveEvent) => {
-      const dx = moveEvent.clientX - startX;
-      const dy = moveEvent.clientY - startY;
-      if (!isClickThreshold(dx, dy)) {
-        cleanupPendingDrag();
-        onDragStart?.(object, origEvent);
-      }
-    };
-
-    const onUp = () => {
-      cleanupPendingDrag();
-    };
-
-    cleanupPendingDrag();
-    pendingDragRef.current = { onMove, onUp };
-    document.addEventListener('pointermove', onMove);
-    document.addEventListener('pointerup', onUp, { once: true });
+    onObjectPointerDown?.(object, event);
   };
 
   const handleTitleDoubleClick = (event) => {

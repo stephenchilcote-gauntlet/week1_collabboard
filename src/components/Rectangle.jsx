@@ -2,12 +2,10 @@ import { useState } from 'react';
 
 export default function Rectangle({
   object,
-  isSelected,
   isDragging,
   lockedByOther,
-  onSelect,
+  onObjectPointerDown,
   onUpdate,
-  onDragStart,
   onResizeStart,
   zoom,
   remoteEntryPhase,
@@ -19,11 +17,10 @@ export default function Rectangle({
     if (lockedByOther) {
       return;
     }
-    onSelect?.(object.id, event);
     if (interactionMode === 'connecting') {
       return;
     }
-    onDragStart?.(object, event);
+    onObjectPointerDown?.(object, event);
   };
 
   const isEntering = remoteEntryPhase === 'initial';

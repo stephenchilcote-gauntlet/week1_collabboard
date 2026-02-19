@@ -17,12 +17,10 @@ const defaultObject = {
 const renderText = (props = {}) => {
   const defaults = {
     object: defaultObject,
-    isSelected: false,
     isDragging: false,
     lockedByOther: false,
-    onSelect: vi.fn(),
+    onObjectPointerDown: vi.fn(),
     onUpdate: vi.fn(),
-    onDragStart: vi.fn(),
     onResizeStart: vi.fn(),
     zoom: 1,
     interactionMode: 'idle',
@@ -59,19 +57,17 @@ describe('TextElement', () => {
     expect(onUpdate).toHaveBeenCalledWith('text-1', { text: 'Updated' });
   });
 
-  it('pointerDown selects and starts drag', () => {
-    const { getByTestId, onSelect, onDragStart } = renderText();
+  it('pointerDown triggers onObjectPointerDown', () => {
+    const { getByTestId, onObjectPointerDown } = renderText();
 
     fireEvent.pointerDown(getByTestId('text-element'), { clientX: 10, clientY: 10 });
-    expect(onSelect).toHaveBeenCalledWith('text-1', expect.any(Object));
-    expect(onDragStart).toHaveBeenCalled();
+    expect(onObjectPointerDown).toHaveBeenCalledWith(defaultObject, expect.any(Object));
   });
 
   it('lockedByOther blocks pointer events', () => {
-    const { getByTestId, onSelect, onDragStart } = renderText({ lockedByOther: true });
+    const { getByTestId, onObjectPointerDown } = renderText({ lockedByOther: true });
 
     fireEvent.pointerDown(getByTestId('text-element'), { clientX: 10, clientY: 10 });
-    expect(onSelect).not.toHaveBeenCalled();
-    expect(onDragStart).not.toHaveBeenCalled();
+    expect(onObjectPointerDown).not.toHaveBeenCalled();
   });
 });

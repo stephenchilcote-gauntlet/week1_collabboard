@@ -10,6 +10,7 @@ import EmbedObject from './EmbedObject.jsx';
 import SelectionOverlay from './SelectionOverlay.jsx';
 import SelectionMarquee from './SelectionMarquee.jsx';
 import { boardToScreen } from '../utils/coordinates.js';
+import { isClickThreshold } from '../hooks/useDrag.js';
 
 const REMOTE_ENTRY_DURATION_MS = 350;
 const OFFSCREEN_TOAST_DURATION_MS = 3000;
@@ -26,6 +27,22 @@ const RESIZE_CURSORS = {
 
 const emptySet = new Set();
 
+const computeNextSelection = (currentSelectedIds, objectId, shiftKey) => {
+  if (shiftKey) {
+    const next = new Set(currentSelectedIds);
+    if (next.has(objectId)) {
+      next.delete(objectId);
+    } else {
+      next.add(objectId);
+    }
+    return next;
+  }
+  if (currentSelectedIds.has(objectId)) {
+    return currentSelectedIds;
+  }
+  return new Set([objectId]);
+};
+
 export default function Board({
   boardRef,
   viewport,
@@ -37,8 +54,7 @@ export default function Board({
   selectedIds,
   draggingId,
   lockedObjectIds,
-  onSelect,
-  onToggleSelect,
+  onSetSelection,
   onClearSelection,
   onUpdateObject,
   onEditingChange,
@@ -85,6 +101,7 @@ export default function Board({
   const prevNotificationObjectsRef = useRef({});
   const lastNotificationRef = useRef({});
   const pointerCaptureRef = useRef(null);
+  const pendingDragRef = useRef(null);
   const [activeResizeCursor, setActiveResizeCursor] = useState('');
 
   const sortedObjects = useMemo(() => Object.values(objects ?? {}).sort((a, b) => (
@@ -340,6 +357,20 @@ export default function Board({
     }
     const containerX = event.clientX - rect.left;
     const containerY = event.clientY - rect.top;
+    if (pendingDragRef.current) {
+      const dx = containerX - pendingDragRef.current.startX;
+      const dy = containerY - pendingDragRef.current.startY;
+      if (!isClickThreshold(dx, dy)) {
+        const { object, nextSelection } = pendingDragRef.current;
+        const selectedObjects = nextSelection.size > 1
+          ? Array.from(nextSelection)
+            .map((id) => objects?.[id])
+            .filter(Boolean)
+          : null;
+        onDragStart?.(object, containerX, containerY, selectedObjects);
+        pendingDragRef.current = null;
+      }
+    }
     handlePanMove(containerX, containerY);
     onDragMove?.(containerX, containerY);
     onResizeMove?.(containerX, containerY);
@@ -349,6 +380,7 @@ export default function Board({
   };
 
   const handlePointerEnd = (event) => {
+    pendingDragRef.current = null;
     const rect = resolvedRef.current?.getBoundingClientRect();
     if (!rect) {
       return;
@@ -364,30 +396,44 @@ export default function Board({
     releasePointer();
   };
 
-  const handleObjectDragStart = (object, event) => {
-    const rect = resolvedRef.current?.getBoundingClientRect();
-    if (!rect) {
-      return;
-    }
-    if (event?.shiftKey) {
-      onToggleSelect?.(object.id);
-    } else {
-      onSelect?.(object.id);
-    }
-    onDragStart?.(object, event.clientX - rect.left, event.clientY - rect.top);
-    capturePointer(event);
-  };
-
   const handleObjectSelect = (objectId, event) => {
     if (event?.shiftKey) {
-      onToggleSelect?.(objectId);
+      const next = new Set(selectionSet);
+      if (next.has(objectId)) {
+        next.delete(objectId);
+      } else {
+        next.add(objectId);
+      }
+      onSetSelection?.(next);
       return;
     }
     if (connectorMode) {
       onConnectorCandidate?.(objectId);
       return;
     }
-    onSelect?.(objectId);
+    onSetSelection?.(new Set([objectId]));
+  };
+
+  const handleObjectPointerDown = (object, event) => {
+    const rect = resolvedRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return;
+    }
+    if (connectorMode && !event.shiftKey) {
+      onConnectorCandidate?.(object.id);
+      return;
+    }
+    const nextSelection = computeNextSelection(selectionSet, object.id, event.shiftKey);
+    onSetSelection?.(nextSelection);
+    const containerX = event.clientX - rect.left;
+    const containerY = event.clientY - rect.top;
+    pendingDragRef.current = {
+      object,
+      nextSelection,
+      startX: containerX,
+      startY: containerY,
+    };
+    capturePointer(event);
   };
 
   const handleObjectUpdate = (objectId, updates) => {
@@ -457,12 +503,10 @@ export default function Board({
               {object.type === 'sticky' && (
                 <StickyNote
                   object={object}
-                  isSelected={selectionSet.has(object.id)}
                   isDragging={object.id === draggingId}
                   lockedByOther={lockedByOther}
-                  onSelect={handleObjectSelect}
                   onUpdate={handleObjectUpdate}
-                  onDragStart={handleObjectDragStart}
+                  onObjectPointerDown={handleObjectPointerDown}
                   onEditStateChange={handleEditingStateChange}
                   zoom={zoom}
                   remoteEntryPhase={remoteEntryPhase}
@@ -472,12 +516,10 @@ export default function Board({
               {object.type === 'rectangle' && (
                 <Rectangle
                   object={object}
-                  isSelected={selectionSet.has(object.id)}
                   isDragging={object.id === draggingId}
                   lockedByOther={lockedByOther}
-                  onSelect={handleObjectSelect}
                   onUpdate={handleObjectUpdate}
-                  onDragStart={handleObjectDragStart}
+                  onObjectPointerDown={handleObjectPointerDown}
                   onResizeStart={onResizeStart}
                   zoom={zoom}
                   remoteEntryPhase={remoteEntryPhase}
@@ -487,12 +529,10 @@ export default function Board({
               {object.type === 'circle' && (
                 <Circle
                   object={object}
-                  isSelected={selectionSet.has(object.id)}
                   isDragging={object.id === draggingId}
                   lockedByOther={lockedByOther}
-                  onSelect={handleObjectSelect}
                   onUpdate={handleObjectUpdate}
-                  onDragStart={handleObjectDragStart}
+                  onObjectPointerDown={handleObjectPointerDown}
                   onResizeStart={onResizeStart}
                   zoom={zoom}
                   remoteEntryPhase={remoteEntryPhase}
@@ -505,9 +545,9 @@ export default function Board({
                   isSelected={selectionSet.has(object.id)}
                   isDragging={object.id === draggingId}
                   lockedByOther={lockedByOther}
-                  onSelect={handleObjectSelect}
+                  onObjectPointerDown={handleObjectPointerDown}
+                  onEndpointSelect={handleObjectSelect}
                   onUpdate={handleObjectUpdate}
-                  onDragStart={handleObjectDragStart}
                   zoom={zoom}
                   remoteEntryPhase={remoteEntryPhase}
                   interactionMode={connectorMode ? 'connecting' : 'idle'}
@@ -516,12 +556,10 @@ export default function Board({
               {object.type === 'text' && (
                 <TextElement
                   object={object}
-                  isSelected={selectionSet.has(object.id)}
                   isDragging={object.id === draggingId}
                   lockedByOther={lockedByOther}
-                  onSelect={handleObjectSelect}
                   onUpdate={handleObjectUpdate}
-                  onDragStart={handleObjectDragStart}
+                  onObjectPointerDown={handleObjectPointerDown}
                   onResizeStart={onResizeStart}
                   onEditStateChange={handleEditingStateChange}
                   zoom={zoom}
@@ -532,12 +570,10 @@ export default function Board({
               {object.type === 'frame' && (
                 <Frame
                   object={object}
-                  isSelected={selectionSet.has(object.id)}
                   isDragging={object.id === draggingId}
                   lockedByOther={lockedByOther}
-                  onSelect={handleObjectSelect}
                   onUpdate={handleObjectUpdate}
-                  onDragStart={handleObjectDragStart}
+                  onObjectPointerDown={handleObjectPointerDown}
                   onResizeStart={onResizeStart}
                   onEditStateChange={handleEditingStateChange}
                   zoom={zoom}
@@ -558,8 +594,7 @@ export default function Board({
                   isSelected={selectionSet.has(object.id)}
                   isDragging={object.id === draggingId}
                   lockedByOther={lockedByOther}
-                  onSelect={handleObjectSelect}
-                  onDragStart={handleObjectDragStart}
+                  onObjectPointerDown={handleObjectPointerDown}
                   zoom={zoom}
                   remoteEntryPhase={remoteEntryPhase}
                   interactionMode={connectorMode ? 'connecting' : 'idle'}

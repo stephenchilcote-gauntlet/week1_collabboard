@@ -20,9 +20,9 @@ const renderLine = (props = {}) => {
     isSelected: false,
     isDragging: false,
     lockedByOther: false,
-    onSelect: vi.fn(),
+    onEndpointSelect: vi.fn(),
     onUpdate: vi.fn(),
-    onDragStart: vi.fn(),
+    onObjectPointerDown: vi.fn(),
     zoom: 1,
     interactionMode: 'idle',
   };
@@ -40,13 +40,12 @@ describe('Line', () => {
     expect(stroke).toBe('#45B7D1');
   });
 
-  it('pointerDown on body selects and starts drag', () => {
-    const { getByTestId, onSelect, onDragStart } = renderLine();
+  it('pointerDown on body triggers onObjectPointerDown', () => {
+    const { getByTestId, onObjectPointerDown } = renderLine();
 
     fireEvent.pointerDown(getByTestId('line-hit-area'), { clientX: 10, clientY: 10 });
 
-    expect(onSelect).toHaveBeenCalledWith('line-1', expect.any(Object));
-    expect(onDragStart).toHaveBeenCalled();
+    expect(onObjectPointerDown).toHaveBeenCalledWith(baseObject, expect.any(Object));
   });
 
   it('dragging an endpoint updates coordinates', () => {
@@ -77,11 +76,10 @@ describe('Line', () => {
   });
 
   it('lockedByOther blocks pointer events', () => {
-    const { getByTestId, onSelect, onDragStart } = renderLine({ lockedByOther: true });
+    const { getByTestId, onObjectPointerDown } = renderLine({ lockedByOther: true });
 
     fireEvent.pointerDown(getByTestId('line-hit-area'), { clientX: 10, clientY: 10 });
 
-    expect(onSelect).not.toHaveBeenCalled();
-    expect(onDragStart).not.toHaveBeenCalled();
+    expect(onObjectPointerDown).not.toHaveBeenCalled();
   });
 });

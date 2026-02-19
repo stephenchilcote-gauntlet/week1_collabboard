@@ -2,12 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 
 export default function TextElement({
   object,
-  isSelected,
   isDragging,
   lockedByOther,
-  onSelect,
+  onObjectPointerDown,
   onUpdate,
-  onDragStart,
   onResizeStart,
   onEditStateChange,
   zoom,
@@ -40,11 +38,10 @@ export default function TextElement({
     if (lockedByOther) {
       return;
     }
-    onSelect?.(object.id, event);
     if (interactionMode === 'connecting' || isEditing) {
       return;
     }
-    onDragStart?.(object, event);
+    onObjectPointerDown?.(object, event);
   };
 
   const handleDoubleClick = (event) => {
