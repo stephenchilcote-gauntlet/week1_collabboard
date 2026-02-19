@@ -62,6 +62,20 @@ describe('Line', () => {
     expect(update.y1).toBe(40);
   });
 
+  it('endpoint drag maps 1:1 in board coordinates when zoomed', () => {
+    const { getByTestId, onUpdate } = renderLine({ isSelected: true, zoom: 2 });
+
+    // pointerDown at clientX=10, clientY=20; drag 40px in screen space
+    fireEvent.pointerDown(getByTestId('line-endpoint-start'), { clientX: 10, clientY: 20 });
+    fireEvent.pointerMove(window, { clientX: 50, clientY: 60 });
+    fireEvent.pointerUp(window);
+
+    const update = onUpdate.mock.calls[onUpdate.mock.calls.length - 1][1];
+    // 40px screen ÷ zoom 2 = 20 board units; original x1=10, y1=20
+    expect(update.x1).toBe(30);
+    expect(update.y1).toBe(40);
+  });
+
   it('lockedByOther blocks pointer events', () => {
     const { getByTestId, onSelect, onDragStart } = renderLine({ lockedByOther: true });
 

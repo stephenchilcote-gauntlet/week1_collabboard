@@ -37,8 +37,8 @@ export default function Line({
     }
 
     const handleMove = (event) => {
-      const dx = event.clientX - startPointer.current.x;
-      const dy = event.clientY - startPointer.current.y;
+      const dx = (event.clientX - startPointer.current.x) / (zoom || 1);
+      const dy = (event.clientY - startPointer.current.y) / (zoom || 1);
       const next = { ...startPoints.current };
       if (draggingEndpoint === 'start') {
         next.x1 = startPoints.current.x1 + dx;
@@ -61,7 +61,7 @@ export default function Line({
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerup', handleUp);
     };
-  }, [draggingEndpoint, object.id, onUpdate]);
+  }, [draggingEndpoint, object.id, onUpdate, zoom]);
 
   const handleBodyPointerDown = (event) => {
     if (lockedByOther) {
