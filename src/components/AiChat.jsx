@@ -492,7 +492,6 @@ export default function AiChat({ onSubmit, isLoading, progress, onNewConversatio
               background: 'linear-gradient(135deg, #eef2ff, #e0e7ff)',
               borderRadius: '4px 16px 16px 16px',
               padding: '8px 14px',
-              overflow: 'hidden',
             }}
           >
             <div style={{ fontSize: 10, color: '#6366f1', fontWeight: 600, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
