@@ -16,13 +16,52 @@ const updateConversation = (boardName, convId, data) => {
   return update(convRef, data);
 };
 
-const buildDisplayMessages = (history) =>
-  history
-    .filter((m) => typeof m.content === 'string')
-    .map((m) => {
-      if (m.role === 'tool') return { role: 'tool', text: m.content, ok: m.ok !== false };
-      return { role: m.role, text: m.content };
-    });
+export const apiHistoryToDisplay = (apiMessages = []) => {
+  const display = [];
+  for (let i = 0; i < apiMessages.length; i += 1) {
+    const message = apiMessages[i];
+    if (!message || !message.role) continue;
+    if (message.role === 'user') {
+      if (typeof message.content === 'string') {
+        display.push({ role: 'user', text: message.content });
+      }
+      continue;
+    }
+    if (message.role === 'assistant') {
+      if (typeof message.content === 'string') {
+        display.push({ role: 'assistant', text: message.content });
+        continue;
+      }
+      if (!Array.isArray(message.content)) continue;
+      message.content.forEach((block) => {
+        if (block?.type === 'text' && block.text) {
+          display.push({ role: 'assistant', text: block.text });
+          return;
+        }
+        if (block?.type === 'tool_use') {
+          const summary = summarizeToolCall(block.name, block.input);
+          let ok = true;
+          const nextMessage = apiMessages[i + 1];
+          if (nextMessage?.role === 'user' && Array.isArray(nextMessage.content)) {
+            const toolResult = nextMessage.content.find(
+              (resultBlock) => resultBlock?.type === 'tool_result' && resultBlock.tool_use_id === block.id,
+            );
+            if (toolResult?.content) {
+              try {
+                const parsed = JSON.parse(toolResult.content);
+                if (parsed?.ok === false) ok = false;
+              } catch (error) {
+                ok = true;
+              }
+            }
+          }
+          display.push({ role: 'tool', text: summary, ok });
+        }
+      });
+    }
+  }
+  return display;
+};
 
 const TOOL_LABELS = {
   createObject: 'Created',
@@ -63,8 +102,14 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
   const objectsRef = useRef(objects);
   objectsRef.current = objects;
   const historyRef = useRef([]);
+  const displayHistoryRef = useRef([]);
+  const pendingDisplayRef = useRef([]);
   const streamingTextRef = useRef('');
   const thinkingTextRef = useRef('');
+
+  const flushDisplayMessages = useCallback(() => {
+    setDisplayMessages([...displayHistoryRef.current, ...pendingDisplayRef.current]);
+  }, []);
 
   // Listen for conversation list from Firebase (most recent 50)
   useEffect(() => {
@@ -95,6 +140,8 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
   const startNewConversation = useCallback(() => {
     setConversationId(null);
     historyRef.current = [];
+    displayHistoryRef.current = [];
+    pendingDisplayRef.current = [];
     setDisplayMessages([]);
   }, []);
 
@@ -106,11 +153,9 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
     const msgs = Array.isArray(conv.messages) ? conv.messages : [];
     historyRef.current = msgs;
     setConversationId(convId);
-    // Use dedicated displayMessages if available, otherwise fall back to legacy format
-    const display = conv.displayMessages
-      ? (Array.isArray(conv.displayMessages) ? conv.displayMessages : [])
-      : msgs;
-    setDisplayMessages(buildDisplayMessages(display));
+    displayHistoryRef.current = apiHistoryToDisplay(historyRef.current);
+    pendingDisplayRef.current = [];
+    setDisplayMessages([...displayHistoryRef.current]);
   }, [boardName]);
 
   const submit = useCallback(async (message) => {
@@ -179,25 +224,36 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
     };
 
     // Optimistically add the user message to display
-    setDisplayMessages((prev) => [...prev, { role: 'user', text: message }]);
+    pendingDisplayRef.current = [{ role: 'user', text: message }];
+    flushDisplayMessages();
 
-    const toolCalls = [];
-    let preToolText = '';
+    let pendingAssistantIndex = null;
+
+    const commitStreamingText = () => {
+      const text = streamingTextRef.current;
+      if (!text) return;
+      if (pendingAssistantIndex === null) {
+        pendingAssistantIndex = pendingDisplayRef.current.length;
+        pendingDisplayRef.current = [...pendingDisplayRef.current, { role: 'assistant', text }];
+      } else {
+        pendingDisplayRef.current[pendingAssistantIndex] = { role: 'assistant', text };
+      }
+      flushDisplayMessages();
+    };
 
     const handleToolCall = (name, input, toolResult) => {
       const summary = summarizeToolCall(name, input);
       const ok = toolResult?.ok !== false;
-      toolCalls.push({ role: 'tool', name, summary, ok });
-      // Replace the first pending tool entry with the final summary
-      setDisplayMessages((prev) => {
-        const idx = prev.findIndex((m) => m.role === 'tool' && m.pending);
-        if (idx !== -1) {
-          const updated = [...prev];
-          updated[idx] = { role: 'tool', text: summary, ok };
-          return updated;
-        }
-        return [...prev, { role: 'tool', text: summary, ok }];
-      });
+      const pendingIndex = [...pendingDisplayRef.current]
+        .reverse()
+        .findIndex((entry) => entry.role === 'tool' && entry.pending);
+      if (pendingIndex !== -1) {
+        const indexFromStart = pendingDisplayRef.current.length - 1 - pendingIndex;
+        pendingDisplayRef.current[indexFromStart] = { role: 'tool', text: summary, ok };
+      } else {
+        pendingDisplayRef.current = [...pendingDisplayRef.current, { role: 'tool', text: summary, ok }];
+      }
+      flushDisplayMessages();
     };
 
     const handleStream = (event) => {
@@ -212,11 +268,8 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
         streamingTextRef.current += event.delta;
         setStreamingText(streamingTextRef.current);
       } else if (event.type === 'toolStart') {
-        // Commit any streamed text as a display message before showing tool status
-        if (streamingTextRef.current && !preToolText) {
-          preToolText = streamingTextRef.current;
-          setDisplayMessages((prev) => [...prev, { role: 'assistant', text: preToolText }]);
-        }
+        commitStreamingText();
+        pendingAssistantIndex = null;
         if (thinkingTextRef.current || streamingTextRef.current) {
           setIsThinking(false);
           setThinkingText('');
@@ -225,20 +278,24 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
           setStreamingText('');
         }
         const pendingLabel = TOOL_PENDING_LABELS[event.name] || event.name;
-        setDisplayMessages((prev) => [...prev, { role: 'tool', text: pendingLabel, pending: true }]);
+        pendingDisplayRef.current = [
+          ...pendingDisplayRef.current,
+          { role: 'tool', text: pendingLabel, pending: true },
+        ];
+        flushDisplayMessages();
       } else if (event.type === 'done') {
+        commitStreamingText();
         setIsThinking(false);
         setThinkingText('');
         thinkingTextRef.current = '';
         streamingTextRef.current = '';
         setStreamingText('');
+        pendingAssistantIndex = null;
       }
     };
 
     try {
       const result = await runAgent(message, operations, setProgress, viewportContext, historyRef.current, handleToolCall, handleStream, traceContext);
-      const replyText = result.text || 'Done!';
-
       // Clear streaming state
       setStreamingText('');
       setThinkingText('');
@@ -247,38 +304,25 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
       thinkingTextRef.current = '';
 
       // Use the full API-format messages from runAgent (includes tool_use/tool_result blocks)
-      historyRef.current = result.messages;
+      const normalizedMessages = Array.isArray(result.messages) ? [...result.messages] : [];
+      const lastMessage = normalizedMessages[normalizedMessages.length - 1];
+      if (result.text) {
+        const alreadyHasFinalText = lastMessage?.role === 'assistant'
+          && typeof lastMessage.content === 'string'
+          && lastMessage.content === result.text;
+        if (!alreadyHasFinalText) {
+          normalizedMessages.push({ role: 'assistant', content: result.text });
+        }
+      }
+      historyRef.current = normalizedMessages;
+      displayHistoryRef.current = apiHistoryToDisplay(historyRef.current);
+      pendingDisplayRef.current = [];
+      setDisplayMessages([...displayHistoryRef.current]);
 
-      // Build display-friendly messages from tool call summaries
-      setDisplayMessages((prev) => {
-        // Remove pending tool entries and tool entries already resolved by handleToolCall
-        const resolvedSummaries = new Set(toolCalls.map((tc) => tc.summary));
-        const cleaned = prev.filter((m) => {
-          if (m.pending) return false;
-          if (m.role === 'tool' && resolvedSummaries.has(m.text)) return false;
-          return true;
-        });
-        return [
-          ...cleaned,
-          ...(preToolText && !cleaned.some((m) => m.text === preToolText)
-            ? [{ role: 'assistant', text: preToolText }]
-            : []),
-          ...toolCalls.map((tc) => ({ role: 'tool', text: tc.summary, ok: tc.ok })),
-          { role: 'assistant', text: replyText },
-        ];
-      });
-
-      // Persist API history and display history to Firebase
-      const displayForPersist = [
-        { role: 'user', content: message },
-        ...(preToolText ? [{ role: 'assistant', content: preToolText }] : []),
-        ...toolCalls.map((tc) => ({ role: 'tool', content: tc.summary, ok: tc.ok })),
-        { role: 'assistant', content: replyText },
-      ];
+      // Persist API history to Firebase
       await updateConversation(boardName, convId, {
         updatedAt: Date.now(),
         messages: historyRef.current,
-        displayMessages: displayForPersist,
       });
     } catch (error) {
       const errorText = `Error: ${error.message}`;
@@ -287,12 +331,13 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
       setIsThinking(false);
       streamingTextRef.current = '';
       thinkingTextRef.current = '';
-      setDisplayMessages((prev) => [...prev, { role: 'assistant', text: errorText }]);
+      pendingDisplayRef.current = [...pendingDisplayRef.current, { role: 'assistant', text: errorText }];
+      setDisplayMessages([...displayHistoryRef.current, ...pendingDisplayRef.current]);
     } finally {
       setIsLoading(false);
       setProgress(null);
     }
-  }, [createObject, updateObject, deleteObject, viewport, cursors, userId, userName, conversationId, boardName, selectedIds]);
+  }, [createObject, updateObject, deleteObject, viewport, cursors, userId, userName, conversationId, boardName, selectedIds, flushDisplayMessages]);
 
   return { submit, isLoading, progress, conversationId, startNewConversation, loadConversation, displayMessages, conversationList, streamingText, thinkingText, isThinking };
 };
