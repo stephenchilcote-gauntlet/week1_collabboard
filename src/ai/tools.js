@@ -17,8 +17,8 @@ export const TOOLS = [
         color: { type: 'string' },
         fontSize: { type: 'number' },
         html: { type: 'string' },
-        fromId: { type: 'string' },
-        toId: { type: 'string' },
+        fromId: { type: 'string', description: 'Label or UUID of source object (for connectors)' },
+        toId: { type: 'string', description: 'Label or UUID of target object (for connectors)' },
         style: { type: 'string', enum: ['line', 'arrow'] },
         zIndex: { type: 'number', description: 'Stack order. Higher = in front. Auto-assigned if omitted.' },
       },
@@ -31,7 +31,7 @@ export const TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        objectId: { type: 'string' },
+        objectId: { type: 'string', description: 'Label or UUID of the object to update' },
         x: { type: 'number', description: 'Center x coordinate' },
         y: { type: 'number', description: 'Center y coordinate' },
         width: { type: 'number' },
@@ -46,11 +46,11 @@ export const TOOLS = [
   },
   {
     name: 'deleteObject',
-    description: 'Delete an object by ID.',
+    description: 'Delete an object by label or ID.',
     input_schema: {
       type: 'object',
       properties: {
-        objectId: { type: 'string' },
+        objectId: { type: 'string', description: 'Label or UUID' },
       },
       required: ['objectId'],
     },
@@ -69,8 +69,8 @@ export const TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        frameId: { type: 'string', description: 'ID of the frame to resize.' },
-        objectIds: { type: 'array', items: { type: 'string' }, description: 'IDs of objects the frame should enclose.' },
+        frameId: { type: 'string', description: 'Label or UUID of the frame to resize.' },
+        objectIds: { type: 'array', items: { type: 'string' }, description: 'Labels or UUIDs of objects the frame should enclose.' },
       },
       required: ['frameId', 'objectIds'],
     },

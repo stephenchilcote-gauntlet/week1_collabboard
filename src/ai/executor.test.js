@@ -239,6 +239,84 @@ describe('executeTool', () => {
     });
   });
 
+  describe('label resolution', () => {
+    it('creates objects with labels and returns them', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('createObject', {
+        type: 'sticky', text: 'Test', x: 100, y: 100,
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.label).toBeDefined();
+      expect(result.label).toMatch(/^[a-z]+ [a-z]+ [a-z]+$/);
+    });
+
+    it('resolves objects by label in updateObject', async () => {
+      const ops = makeOperations();
+      const createResult = await executeTool('createObject', {
+        type: 'sticky', text: 'Hello', x: 0, y: 0,
+      }, ops);
+      const result = await executeTool('updateObject', {
+        objectId: createResult.label, text: 'Updated',
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.label).toBe(createResult.label);
+    });
+
+    it('resolves objects by label in deleteObject', async () => {
+      const ops = makeOperations();
+      const createResult = await executeTool('createObject', {
+        type: 'rectangle', x: 0, y: 0,
+      }, ops);
+      const result = await executeTool('deleteObject', {
+        objectId: createResult.label,
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.label).toBe(createResult.label);
+    });
+
+    it('resolves connector fromId/toId by labels', async () => {
+      const ops = makeOperations();
+      const a = await executeTool('createObject', { type: 'circle', x: 0, y: 0 }, ops);
+      const b = await executeTool('createObject', { type: 'circle', x: 300, y: 0 }, ops);
+      const conn = await executeTool('createObject', {
+        type: 'connector', fromId: a.label, toId: b.label,
+      }, ops);
+      expect(conn.ok).toBe(true);
+      expect(conn.label).toBeDefined();
+    });
+
+    it('returns error with matches on label collision', async () => {
+      const ops = makeOperations({
+        x1: { id: 'x1', label: 'dup-label', type: 'sticky' },
+        x2: { id: 'x2', label: 'dup-label', type: 'rectangle' },
+      });
+      const result = await executeTool('updateObject', {
+        objectId: 'dup-label', text: 'test',
+      }, ops);
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('Multiple');
+      expect(result.matches).toHaveLength(2);
+    });
+
+    it('still accepts raw UUIDs', async () => {
+      const ops = makeOperations({
+        'abc-123': { id: 'abc-123', label: 'some-word-label', type: 'sticky', text: 'Old' },
+      });
+      const result = await executeTool('updateObject', {
+        objectId: 'abc-123', text: 'New',
+      }, ops);
+      expect(result.ok).toBe(true);
+    });
+
+    it('getBoardState includes labels', async () => {
+      const ops = makeOperations();
+      await executeTool('createObject', { type: 'sticky', text: 'Hi', x: 0, y: 0 }, ops);
+      const result = await executeTool('getBoardState', {}, ops);
+      expect(result.objects[0].label).toBeDefined();
+      expect(result.objects[0].label).toMatch(/^[a-z]+ [a-z]+ [a-z]+$/);
+    });
+  });
+
   describe('unknown tool', () => {
     it('returns error for unknown tool name', async () => {
       const ops = makeOperations();

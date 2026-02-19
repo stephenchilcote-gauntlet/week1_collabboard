@@ -9,6 +9,7 @@ import {
   DEFAULT_TEXT_COLOR,
 } from '../utils/colors.js';
 import { getObjectBounds, intersectsRect, containsRect } from '../utils/coordinates.js';
+import { uuidToLabel } from './labels.js';
 
 const TYPE_DEFAULTS = {
   sticky: { width: 200, height: 160, color: DEFAULT_STICKY_COLOR },
@@ -23,28 +24,47 @@ const TYPE_DEFAULTS = {
 const maxZIndex = (objects) =>
   Object.values(objects).reduce((max, o) => Math.max(max, o.zIndex ?? 0), 0);
 
+// Resolve a label or UUID to a UUID. Returns { ok, id, matches? } or { ok:false, error }.
+const resolveId = (value, objects) => {
+  if (!value) return { ok: false, error: 'No ID provided.' };
+  // Direct UUID match (own property only — avoid prototype keys like 'constructor')
+  if (Object.hasOwn(objects, value)) return { ok: true, id: value };
+  // Label match — find objects whose label matches
+  const matches = Object.values(objects).filter((o) => o.label === value);
+  if (matches.length === 1) return { ok: true, id: matches[0].id };
+  if (matches.length > 1) {
+    const details = matches.map((o) => ({ id: o.id, label: o.label, type: o.type }));
+    return { ok: false, error: `Multiple objects match label "${value}".`, matches: details };
+  }
+  return { ok: false, error: `Object "${value}" not found.` };
+};
+
 const handleCreate = async (input, operations) => {
   const { createObject, getObjects } = operations;
   const defaults = TYPE_DEFAULTS[input.type] ?? {};
   const objects = getObjects();
 
   if (input.type === 'connector') {
-    if (!objects[input.fromId]) return { ok: false, error: `Source object ${input.fromId} not found.` };
-    if (!objects[input.toId]) return { ok: false, error: `Target object ${input.toId} not found.` };
-    const fromZ = objects[input.fromId].zIndex ?? 0;
-    const toZ = objects[input.toId].zIndex ?? 0;
+    const fromRes = resolveId(input.fromId, objects);
+    if (!fromRes.ok) return { ok: false, error: `Source: ${fromRes.error}`, matches: fromRes.matches };
+    const toRes = resolveId(input.toId, objects);
+    if (!toRes.ok) return { ok: false, error: `Target: ${toRes.error}`, matches: toRes.matches };
+    const fromZ = objects[fromRes.id].zIndex ?? 0;
+    const toZ = objects[toRes.id].zIndex ?? 0;
+    const id = generateId();
     const obj = {
-      id: generateId(),
+      id,
       type: 'connector',
-      fromId: input.fromId,
-      toId: input.toId,
+      label: uuidToLabel(id),
+      fromId: fromRes.id,
+      toId: toRes.id,
       style: input.style || defaults.style,
       strokeWidth: defaults.strokeWidth,
       color: input.color || defaults.color,
       zIndex: input.zIndex ?? Math.min(fromZ, toZ) - 1,
     };
     const created = await createObject(obj);
-    return { ok: true, objectId: created.id, type: 'connector' };
+    return { ok: true, label: created.label, type: 'connector' };
   }
 
   const color = input.color || defaults.color;
@@ -53,9 +73,11 @@ const handleCreate = async (input, operations) => {
   const centerX = input.x ?? 0;
   const centerY = input.y ?? 0;
   const autoZ = input.type === 'frame' ? (maxZIndex(objects) - 1) : (maxZIndex(objects) + 1);
+  const id = generateId();
   const obj = {
-    id: generateId(),
+    id,
     type: input.type,
+    label: uuidToLabel(id),
     x: centerX - width / 2,
     y: centerY - height / 2,
     width,
@@ -70,14 +92,16 @@ const handleCreate = async (input, operations) => {
   if (input.type === 'embed') obj.html = input.html ?? '';
 
   const created = await createObject(obj);
-  return { ok: true, objectId: created.id, type: input.type };
+  return { ok: true, label: created.label, type: input.type };
 };
 
 const handleUpdate = async (input, operations) => {
   const { updateObject, getObjects } = operations;
   const objects = getObjects();
-  const target = objects[input.objectId];
-  if (!target) return { ok: false, error: `Object ${input.objectId} not found.` };
+  const res = resolveId(input.objectId, objects);
+  if (!res.ok) return { ok: false, error: res.error, matches: res.matches };
+  const objectId = res.id;
+  const target = objects[objectId];
 
   const updates = {};
   const newWidth = input.width ?? target.width ?? 0;
@@ -120,15 +144,17 @@ const handleUpdate = async (input, operations) => {
     }
   }
 
-  await Promise.all([updateObject(input.objectId, updates), ...movedChildren]);
-  return { ok: true, objectId: input.objectId, movedChildren: movedChildren.length };
+  await Promise.all([updateObject(objectId, updates), ...movedChildren]);
+  return { ok: true, label: target.label, movedChildren: movedChildren.length };
 };
 
 const handleDelete = async (input, operations) => {
   const objects = operations.getObjects();
-  if (!objects[input.objectId]) return { ok: false, error: `Object ${input.objectId} not found.` };
-  await operations.deleteObject(input.objectId);
-  return { ok: true, objectId: input.objectId };
+  const res = resolveId(input.objectId, objects);
+  if (!res.ok) return { ok: false, error: res.error, matches: res.matches };
+  const label = objects[res.id]?.label;
+  await operations.deleteObject(res.id);
+  return { ok: true, label };
 };
 
 const handleGetBoardState = (operations) => {
@@ -150,7 +176,8 @@ const handleGetBoardState = (operations) => {
     .map((obj) => {
       const cx = (obj.width != null) ? obj.x + obj.width / 2 : obj.x;
       const cy = (obj.height != null) ? obj.y + obj.height / 2 : obj.y;
-      const base = { id: obj.id, type: obj.type, x: cx, y: cy };
+      const label = obj.label || uuidToLabel(obj.id);
+      const base = { label, id: obj.id, type: obj.type, x: cx, y: cy };
       if (obj.width != null) base.width = obj.width;
       if (obj.height != null) base.height = obj.height;
       if (obj.text != null) base.text = obj.text;
@@ -166,12 +193,16 @@ const handleGetBoardState = (operations) => {
 const handleFitFrameToObjects = async (input, operations) => {
   const { updateObject, getObjects } = operations;
   const objects = getObjects();
-  const frame = objects[input.frameId];
-  if (!frame) return { ok: false, error: `Frame ${input.frameId} not found.` };
-  if (frame.type !== 'frame') return { ok: false, error: `Object ${input.frameId} is not a frame.` };
+  const frameRes = resolveId(input.frameId, objects);
+  if (!frameRes.ok) return { ok: false, error: frameRes.error, matches: frameRes.matches };
+  const frame = objects[frameRes.id];
+  if (frame.type !== 'frame') return { ok: false, error: `Object "${input.frameId}" is not a frame.` };
   if (!input.objectIds || input.objectIds.length === 0) return { ok: false, error: 'No objectIds provided.' };
 
-  const targets = input.objectIds.map((id) => objects[id]).filter(Boolean);
+  const resolvedIds = input.objectIds.map((v) => resolveId(v, objects));
+  const failed = resolvedIds.find((r) => !r.ok);
+  if (failed) return { ok: false, error: failed.error, matches: failed.matches };
+  const targets = resolvedIds.map((r) => objects[r.id]).filter(Boolean);
   if (targets.length === 0) return { ok: false, error: 'None of the specified objects were found.' };
 
   const bounds = targets.map((o) => getObjectBounds(o));
@@ -191,8 +222,8 @@ const handleFitFrameToObjects = async (input, operations) => {
     width: bw + padX * 2,
     height: bh + padY * 2,
   };
-  await updateObject(input.frameId, updates);
-  return { ok: true, objectId: input.frameId };
+  await updateObject(frameRes.id, updates);
+  return { ok: true, label: frame.label };
 };
 
 export const executeTool = async (toolName, input, operations) => {
