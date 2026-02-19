@@ -106,7 +106,11 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
     const msgs = Array.isArray(conv.messages) ? conv.messages : [];
     historyRef.current = msgs;
     setConversationId(convId);
-    setDisplayMessages(buildDisplayMessages(msgs));
+    // Use dedicated displayMessages if available, otherwise fall back to legacy format
+    const display = conv.displayMessages
+      ? (Array.isArray(conv.displayMessages) ? conv.displayMessages : [])
+      : msgs;
+    setDisplayMessages(buildDisplayMessages(display));
   }, [boardName]);
 
   const submit = useCallback(async (message) => {
@@ -232,8 +236,7 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
     };
 
     try {
-      const apiHistory = historyRef.current.filter((m) => m.role !== 'tool');
-      const result = await runAgent(message, operations, setProgress, viewportContext, apiHistory, handleToolCall, handleStream, traceContext);
+      const result = await runAgent(message, operations, setProgress, viewportContext, historyRef.current, handleToolCall, handleStream, traceContext);
       const replyText = result.text || 'Done!';
 
       // Clear streaming state
@@ -243,22 +246,31 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
       streamingTextRef.current = '';
       thinkingTextRef.current = '';
 
-      // Store user message, pre-tool text, tool calls, and final assistant reply in history
-      historyRef.current = [
-        ...historyRef.current,
+      // Use the full API-format messages from runAgent (includes tool_use/tool_result blocks)
+      historyRef.current = result.messages;
+
+      // Build display-friendly messages from tool call summaries
+      const displayHistory = [
+        ...displayMessages,
+        ...(preToolText && !displayMessages.some((m) => m.text === preToolText)
+          ? [{ role: 'assistant', text: preToolText }]
+          : []),
+        ...toolCalls.map((tc) => ({ role: 'tool', text: tc.summary, ok: tc.ok })),
+        { role: 'assistant', text: replyText },
+      ];
+      setDisplayMessages(displayHistory);
+
+      // Persist API history and display history to Firebase
+      const displayForPersist = [
         { role: 'user', content: message },
         ...(preToolText ? [{ role: 'assistant', content: preToolText }] : []),
         ...toolCalls.map((tc) => ({ role: 'tool', content: tc.summary, ok: tc.ok })),
         { role: 'assistant', content: replyText },
       ];
-
-      // Update display messages from canonical history
-      setDisplayMessages(buildDisplayMessages(historyRef.current));
-
-      // Persist to Firebase
       await updateConversation(boardName, convId, {
         updatedAt: Date.now(),
         messages: historyRef.current,
+        displayMessages: displayForPersist,
       });
     } catch (error) {
       const errorText = `Error: ${error.message}`;
