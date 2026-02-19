@@ -7,8 +7,8 @@ describe('TOOLS', () => {
     expect(TOOLS.length).toBeGreaterThan(0);
   });
 
-  it('has exactly 4 consolidated tools', () => {
-    expect(TOOL_NAMES).toEqual(['createObject', 'updateObject', 'deleteObject', 'getBoardState']);
+  it('has exactly 5 consolidated tools', () => {
+    expect(TOOL_NAMES).toEqual(['createObject', 'updateObject', 'deleteObject', 'getBoardState', 'fitFrameToObjects']);
   });
 
   it('every tool has name, description, and input_schema', () => {

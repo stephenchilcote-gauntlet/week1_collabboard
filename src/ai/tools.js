@@ -1,4 +1,4 @@
-// Anthropic tool-use definitions — consolidated to 4 tools for minimal token usage.
+// Anthropic tool-use definitions — consolidated to 5 tools for minimal token usage.
 
 export const TOOLS = [
   {
@@ -57,10 +57,22 @@ export const TOOLS = [
   },
   {
     name: 'getBoardState',
-    description: 'Get all objects currently on the board.',
+    description: 'Get objects in/near the user\'s viewport (visible area + 25% margin). Objects far off-screen are excluded.',
     input_schema: {
       type: 'object',
       properties: {},
+    },
+  },
+  {
+    name: 'fitFrameToObjects',
+    description: 'Resize and reposition a frame to fit the bounding box of the given objects, plus 15% padding.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        frameId: { type: 'string', description: 'ID of the frame to resize.' },
+        objectIds: { type: 'array', items: { type: 'string' }, description: 'IDs of objects the frame should enclose.' },
+      },
+      required: ['frameId', 'objectIds'],
     },
   },
 ];

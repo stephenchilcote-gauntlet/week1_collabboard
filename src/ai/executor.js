@@ -8,7 +8,7 @@ import {
   DEFAULT_CIRCLE_COLOR,
   DEFAULT_TEXT_COLOR,
 } from '../utils/colors.js';
-import { containsRect, getObjectBounds } from '../utils/coordinates.js';
+import { getObjectBounds, intersectsRect, containsRect } from '../utils/coordinates.js';
 
 const TYPE_DEFAULTS = {
   sticky: { width: 200, height: 160, color: DEFAULT_STICKY_COLOR },
@@ -133,20 +133,66 @@ const handleDelete = async (input, operations) => {
 
 const handleGetBoardState = (operations) => {
   const objects = operations.getObjects();
-  const summary = Object.values(objects).map((obj) => {
-    const cx = (obj.width != null) ? obj.x + obj.width / 2 : obj.x;
-    const cy = (obj.height != null) ? obj.y + obj.height / 2 : obj.y;
-    const base = { id: obj.id, type: obj.type, x: cx, y: cy };
-    if (obj.width != null) base.width = obj.width;
-    if (obj.height != null) base.height = obj.height;
-    if (obj.text != null) base.text = obj.text;
-    if (obj.title != null) base.title = obj.title;
-    if (obj.color != null) base.color = obj.color;
-    if (obj.html != null) base.html = obj.html.slice(0, 200);
-    if (obj.zIndex != null) base.zIndex = obj.zIndex;
-    return base;
-  });
+  const vc = operations.viewportContext;
+
+  // Build expanded viewport rect (25% margin on each side)
+  let viewRect = null;
+  if (vc) {
+    const w = vc.viewRight - vc.viewLeft;
+    const h = vc.viewBottom - vc.viewTop;
+    const mx = w * 0.25;
+    const my = h * 0.25;
+    viewRect = { x: vc.viewLeft - mx, y: vc.viewTop - my, width: w + mx * 2, height: h + my * 2 };
+  }
+
+  const summary = Object.values(objects)
+    .filter((obj) => !viewRect || intersectsRect(viewRect, getObjectBounds(obj)))
+    .map((obj) => {
+      const cx = (obj.width != null) ? obj.x + obj.width / 2 : obj.x;
+      const cy = (obj.height != null) ? obj.y + obj.height / 2 : obj.y;
+      const base = { id: obj.id, type: obj.type, x: cx, y: cy };
+      if (obj.width != null) base.width = obj.width;
+      if (obj.height != null) base.height = obj.height;
+      if (obj.text != null) base.text = obj.text;
+      if (obj.title != null) base.title = obj.title;
+      if (obj.color != null) base.color = obj.color;
+      if (obj.html != null) base.html = obj.html.slice(0, 200);
+      if (obj.zIndex != null) base.zIndex = obj.zIndex;
+      return base;
+    });
   return { ok: true, objects: summary, count: summary.length };
+};
+
+const handleFitFrameToObjects = async (input, operations) => {
+  const { updateObject, getObjects } = operations;
+  const objects = getObjects();
+  const frame = objects[input.frameId];
+  if (!frame) return { ok: false, error: `Frame ${input.frameId} not found.` };
+  if (frame.type !== 'frame') return { ok: false, error: `Object ${input.frameId} is not a frame.` };
+  if (!input.objectIds || input.objectIds.length === 0) return { ok: false, error: 'No objectIds provided.' };
+
+  const targets = input.objectIds.map((id) => objects[id]).filter(Boolean);
+  if (targets.length === 0) return { ok: false, error: 'None of the specified objects were found.' };
+
+  const bounds = targets.map((o) => getObjectBounds(o));
+  const minX = Math.min(...bounds.map((b) => b.x));
+  const minY = Math.min(...bounds.map((b) => b.y));
+  const maxX = Math.max(...bounds.map((b) => b.x + b.width));
+  const maxY = Math.max(...bounds.map((b) => b.y + b.height));
+
+  const bw = maxX - minX;
+  const bh = maxY - minY;
+  const padX = bw * 0.15;
+  const padY = bh * 0.15;
+
+  const updates = {
+    x: minX - padX,
+    y: minY - padY,
+    width: bw + padX * 2,
+    height: bh + padY * 2,
+  };
+  await updateObject(input.frameId, updates);
+  return { ok: true, objectId: input.frameId };
 };
 
 export const executeTool = async (toolName, input, operations) => {
@@ -158,6 +204,7 @@ export const executeTool = async (toolName, input, operations) => {
       case 'updateObject': result = await handleUpdate(input, operations); break;
       case 'deleteObject': result = await handleDelete(input, operations); break;
       case 'getBoardState': result = handleGetBoardState(operations); break;
+      case 'fitFrameToObjects': result = await handleFitFrameToObjects(input, operations); break;
       default: result = { ok: false, error: `Unknown tool: ${toolName}` };
     }
   } catch (err) {

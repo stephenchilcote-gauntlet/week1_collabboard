@@ -29,6 +29,7 @@ const TOOL_LABELS = {
   updateObject: 'Updated',
   deleteObject: 'Deleted',
   getBoardState: 'Read board',
+  fitFrameToObjects: 'Fit frame',
 };
 
 const TOOL_PENDING_LABELS = {
@@ -36,6 +37,7 @@ const TOOL_PENDING_LABELS = {
   updateObject: 'Updating…',
   deleteObject: 'Deleting…',
   getBoardState: 'Reading board…',
+  fitFrameToObjects: 'Fitting frame…',
 };
 
 const summarizeToolCall = (name, input) => {
@@ -49,7 +51,7 @@ const summarizeToolCall = (name, input) => {
   return label;
 };
 
-export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, viewport, cursors, userId, userName, boardName }) => {
+export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, viewport, cursors, userId, userName, boardName, selectedIds }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(null);
   const [conversationId, setConversationId] = useState(null);
@@ -121,6 +123,7 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
       updateObject,
       deleteObject,
       getObjects: () => objectsRef.current,
+      viewportContext: null,
     };
 
     let viewportContext = null;
@@ -135,6 +138,7 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
         viewport.viewportWidth / 2, viewport.viewportHeight / 2,
         viewport.panX, viewport.panY, viewport.zoom,
       );
+      const selIds = selectedIds instanceof Set ? [...selectedIds] : [];
       viewportContext = {
         viewLeft: topLeft.x,
         viewTop: topLeft.y,
@@ -142,7 +146,9 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
         viewBottom: bottomRight.y,
         cursorX: myCursor?.x ?? center.x,
         cursorY: myCursor?.y ?? center.y,
+        selectedIds: selIds,
       };
+      operations.viewportContext = viewportContext;
     }
 
     // Create conversation in Firebase if this is the first message
@@ -172,6 +178,7 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
     setDisplayMessages((prev) => [...prev, { role: 'user', text: message }]);
 
     const toolCalls = [];
+    let preToolText = '';
 
     const handleToolCall = (name, input, toolResult) => {
       const summary = summarizeToolCall(name, input);
@@ -201,7 +208,11 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
         streamingTextRef.current += event.delta;
         setStreamingText(streamingTextRef.current);
       } else if (event.type === 'toolStart') {
-        // Clear thinking/streaming on first tool
+        // Commit any streamed text as a display message before showing tool status
+        if (streamingTextRef.current && !preToolText) {
+          preToolText = streamingTextRef.current;
+          setDisplayMessages((prev) => [...prev, { role: 'assistant', text: preToolText }]);
+        }
         if (thinkingTextRef.current || streamingTextRef.current) {
           setIsThinking(false);
           setThinkingText('');
@@ -232,10 +243,11 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
       streamingTextRef.current = '';
       thinkingTextRef.current = '';
 
-      // Store user message, tool calls, and final assistant reply in history
+      // Store user message, pre-tool text, tool calls, and final assistant reply in history
       historyRef.current = [
         ...historyRef.current,
         { role: 'user', content: message },
+        ...(preToolText ? [{ role: 'assistant', content: preToolText }] : []),
         ...toolCalls.map((tc) => ({ role: 'tool', content: tc.summary, ok: tc.ok })),
         { role: 'assistant', content: replyText },
       ];
@@ -260,7 +272,7 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
       setIsLoading(false);
       setProgress(null);
     }
-  }, [createObject, updateObject, deleteObject, viewport, cursors, userId, userName, conversationId, boardName]);
+  }, [createObject, updateObject, deleteObject, viewport, cursors, userId, userName, conversationId, boardName, selectedIds]);
 
   return { submit, isLoading, progress, conversationId, startNewConversation, loadConversation, displayMessages, conversationList, streamingText, thinkingText, isThinking };
 };
