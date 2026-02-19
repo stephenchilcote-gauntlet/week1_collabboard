@@ -156,8 +156,10 @@ export default function AiChat({ onSubmit, isLoading, progress, onNewConversatio
   const [isHistoryHovered, setIsHistoryHovered] = useState(false);
   const [isSendHovered, setIsSendHovered] = useState(false);
   const [hoveredConvId, setHoveredConvId] = useState(null);
+  const [thinkingScrollDuration, setThinkingScrollDuration] = useState(12);
   const textareaRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const thinkingRateRef = useRef({ time: 0, length: 0, rate: 0 });
 
   useEffect(() => {
     if (isOpen && textareaRef.current) {
@@ -168,6 +170,34 @@ export default function AiChat({ onSubmit, isLoading, progress, onNewConversatio
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [messages, isLoading, streamingText, isThinking]);
+
+  useEffect(() => {
+    if (!isThinking || !thinkingText) {
+      setThinkingScrollDuration(12);
+      thinkingRateRef.current = { time: 0, length: thinkingText.length, rate: 0 };
+      return;
+    }
+
+    const now = Date.now();
+    const { time, length, rate } = thinkingRateRef.current;
+    const deltaChars = thinkingText.length - length;
+    const deltaTime = time ? (now - time) / 1000 : 0;
+
+    if (deltaChars > 0 && deltaTime > 0.05) {
+      const instantRate = deltaChars / deltaTime;
+      const smoothedRate = rate ? rate * 0.6 + instantRate * 0.4 : instantRate;
+      const targetRate = Math.max(2, smoothedRate * 0.85);
+      const displayLength = Math.min(thinkingText.length, 300);
+      const duration = Math.min(30, Math.max(6, displayLength / targetRate));
+      setThinkingScrollDuration(duration);
+      thinkingRateRef.current = { time: now, length: thinkingText.length, rate: smoothedRate };
+      return;
+    }
+
+    if (!time) {
+      thinkingRateRef.current = { time: now, length: thinkingText.length, rate };
+    }
+  }, [thinkingText, isThinking]);
 
   const handleSubmit = useCallback((event) => {
     if (event) event.preventDefault();
@@ -220,6 +250,7 @@ export default function AiChat({ onSubmit, isLoading, progress, onNewConversatio
     : '';
 
   const hasInput = input.trim().length > 0;
+  const displayedThinkingText = thinkingText.slice(-300);
 
   if (!isOpen) {
     return (
@@ -511,10 +542,10 @@ export default function AiChat({ onSubmit, isLoading, progress, onNewConversatio
                 fontSize: 11,
                 color: '#818cf8',
                 lineHeight: '32px',
-                animation: 'thinkingScroll 12s linear infinite',
+                animation: `thinkingScroll ${thinkingScrollDuration}s linear infinite`,
                 right: 0,
               }}>
-                {thinkingText.slice(-300)}
+                {displayedThinkingText}
               </div>
             </div>
           </div>
