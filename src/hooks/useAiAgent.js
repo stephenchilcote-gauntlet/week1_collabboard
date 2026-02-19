@@ -250,14 +250,23 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
       historyRef.current = result.messages;
 
       // Build display-friendly messages from tool call summaries
-      setDisplayMessages((prev) => [
-        ...prev.filter((m) => !m.pending),
-        ...(preToolText && !prev.some((m) => m.text === preToolText)
-          ? [{ role: 'assistant', text: preToolText }]
-          : []),
-        ...toolCalls.map((tc) => ({ role: 'tool', text: tc.summary, ok: tc.ok })),
-        { role: 'assistant', text: replyText },
-      ]);
+      setDisplayMessages((prev) => {
+        // Remove pending tool entries and tool entries already resolved by handleToolCall
+        const resolvedSummaries = new Set(toolCalls.map((tc) => tc.summary));
+        const cleaned = prev.filter((m) => {
+          if (m.pending) return false;
+          if (m.role === 'tool' && resolvedSummaries.has(m.text)) return false;
+          return true;
+        });
+        return [
+          ...cleaned,
+          ...(preToolText && !cleaned.some((m) => m.text === preToolText)
+            ? [{ role: 'assistant', text: preToolText }]
+            : []),
+          ...toolCalls.map((tc) => ({ role: 'tool', text: tc.summary, ok: tc.ok })),
+          { role: 'assistant', text: replyText },
+        ];
+      });
 
       // Persist API history and display history to Firebase
       const displayForPersist = [
