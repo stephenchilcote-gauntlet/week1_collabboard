@@ -30,3 +30,7 @@ dist-ssr
 # Environment
 .env
 .env.local
+
+# Perf test auth state (contains tokens)
+perf/auth-state.json
+test-results/

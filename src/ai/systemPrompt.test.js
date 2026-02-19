@@ -27,4 +27,22 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('(1401,900)');
     expect(prompt).toContain('(500,351)');
   });
+
+  it('includes selected object IDs when present', () => {
+    const prompt = buildSystemPrompt({
+      viewLeft: 0, viewTop: 0, viewRight: 1000, viewBottom: 800,
+      cursorX: 500, cursorY: 400,
+      selectedIds: ['abc123', 'def456'],
+    });
+    expect(prompt).toContain('Selected objects: abc123, def456');
+  });
+
+  it('omits selected objects line when none selected', () => {
+    const prompt = buildSystemPrompt({
+      viewLeft: 0, viewTop: 0, viewRight: 1000, viewBottom: 800,
+      cursorX: 500, cursorY: 400,
+      selectedIds: [],
+    });
+    expect(prompt).not.toContain('Selected');
+  });
 });

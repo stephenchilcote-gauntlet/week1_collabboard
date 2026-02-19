@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { onValue, ref, remove, set, update } from 'firebase/database';
+import { onValue, ref, remove, set, update, child } from 'firebase/database';
 import { db } from '../firebase/config.js';
 import {
   DEFAULT_RECTANGLE_COLOR,
@@ -248,6 +248,11 @@ export const useBoardObjects = ({ user, boardName, draggingId = null, editingId 
     return set(objectRef, objectData);
   }, [boardName]);
 
+  const clearBoard = useCallback(() => {
+    const objectsRef = ref(db, `boards/${boardName}/objects`);
+    return remove(objectsRef);
+  }, [boardName]);
+
   const value = useMemo(() => ({
     objects,
     objectsLoaded,
@@ -262,6 +267,7 @@ export const useBoardObjects = ({ user, boardName, draggingId = null, editingId 
     createObject,
     deleteObject,
     restoreObject,
+    clearBoard,
     localCreatedIds: localCreatedIds.current,
   }), [
     objects,
@@ -277,6 +283,7 @@ export const useBoardObjects = ({ user, boardName, draggingId = null, editingId 
     createObject,
     deleteObject,
     restoreObject,
+    clearBoard,
   ]);
 
   return value;

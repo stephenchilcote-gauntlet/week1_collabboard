@@ -4,7 +4,7 @@ import { throttle } from '../utils/throttle.js';
 
 export const isClickThreshold = (dx, dy) => Math.hypot(dx, dy) < 5;
 
-export const useDrag = (viewport, updateObject, selectObject, onDragStateChange) => {
+export const useDrag = (viewport, updateObject, onDragStateChange) => {
   const [draggingId, setDraggingId] = useState(null);
   const dragAnchor = useRef({ x: 0, y: 0 });
   const startPointer = useRef({ x: 0, y: 0 });
@@ -59,10 +59,8 @@ export const useDrag = (viewport, updateObject, selectObject, onDragStateChange)
     } else {
       multiUpdateRef.current = null;
     }
-    if (!selectedObjects) {
-      selectObject?.(object.id);
-    }
-  }, [selectObject, updateDraggingId]);
+    
+  }, [updateDraggingId]);
 
   const handleDragMove = useCallback((containerX, containerY) => {
     if (!draggingId) {

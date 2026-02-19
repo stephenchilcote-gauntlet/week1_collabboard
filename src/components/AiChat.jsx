@@ -166,7 +166,7 @@ export default function AiChat({ onSubmit, isLoading, progress, onNewConversatio
   }, [isOpen]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [messages, isLoading, streamingText, isThinking]);
 
   const handleSubmit = useCallback((event) => {
@@ -593,7 +593,7 @@ export default function AiChat({ onSubmit, isLoading, progress, onNewConversatio
             )}
           </div>
         )}
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} style={{ minHeight: '40vh', flexShrink: 0 }} />
       </div>}
 
       {/* Input area */}
