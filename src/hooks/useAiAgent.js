@@ -250,15 +250,14 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
       historyRef.current = result.messages;
 
       // Build display-friendly messages from tool call summaries
-      const displayHistory = [
-        ...displayMessages,
-        ...(preToolText && !displayMessages.some((m) => m.text === preToolText)
+      setDisplayMessages((prev) => [
+        ...prev.filter((m) => !m.pending),
+        ...(preToolText && !prev.some((m) => m.text === preToolText)
           ? [{ role: 'assistant', text: preToolText }]
           : []),
         ...toolCalls.map((tc) => ({ role: 'tool', text: tc.summary, ok: tc.ok })),
         { role: 'assistant', text: replyText },
-      ];
-      setDisplayMessages(displayHistory);
+      ]);
 
       // Persist API history and display history to Firebase
       const displayForPersist = [
