@@ -90,7 +90,9 @@ const handleCreate = async (input, operations) => {
     ...(color != null && { color }),
   };
 
-  if (input.type === 'sticky' || input.type === 'text') obj.text = input.text ?? '';
+  if (input.text != null || input.type === 'sticky' || input.type === 'text' || input.type === 'rectangle' || input.type === 'circle') {
+    obj.text = input.text ?? '';
+  }
   if (input.type === 'text') obj.fontSize = input.fontSize ?? defaults.fontSize;
   if (input.type === 'frame') obj.title = input.title ?? 'Frame';
   if (input.type === 'embed') obj.html = input.html ?? '';

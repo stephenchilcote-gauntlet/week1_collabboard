@@ -52,7 +52,28 @@ export default function Circle({
         boxShadow: isHighlighted ? '0 0 0 3px rgba(59, 130, 246, 0.35)' : isHovered && !lockedByOther ? '0 0 0 2px rgba(59, 130, 246, 0.25)' : 'none',
         transform: object.rotation ? `rotate(${object.rotation}deg)` : undefined,
         transformOrigin: 'center',
+        overflow: 'hidden',
       }}
-    />
+    >
+      {object.text && (
+        <div style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 12,
+          boxSizing: 'border-box',
+          fontSize: 14,
+          color: '#1f2937',
+          textAlign: 'center',
+          overflowWrap: 'break-word',
+          userSelect: 'none',
+          pointerEvents: 'none',
+        }}>
+          {object.text}
+        </div>
+      )}
+    </div>
   );
 }
