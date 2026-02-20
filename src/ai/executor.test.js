@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { executeTool } from './executor.js';
+import { executeTool, collectViewportObjects } from './executor.js';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -452,6 +452,50 @@ describe('executeTool', () => {
       const boardData = fetchBody.messages[0].content;
       // The board data sent to the sub-agent should contain a label
       expect(boardData).toMatch(/[a-z]+ [a-z]+ [a-z]+/);
+    });
+  });
+
+  describe('collectViewportObjects connectors', () => {
+    it('includes connectors between visible objects with from/to labels', () => {
+      const ops = makeOperations({
+        a: { id: 'a', label: 'node-a', type: 'circle', x: 100, y: 100, width: 50, height: 50 },
+        b: { id: 'b', label: 'node-b', type: 'circle', x: 300, y: 100, width: 50, height: 50 },
+        c1: { id: 'c1', type: 'connector', fromId: 'a', toId: 'b', style: 'arrow', color: '#000' },
+      });
+      const result = collectViewportObjects(ops);
+      const conn = result.find((o) => o.type === 'connector');
+      expect(conn).toBeDefined();
+      expect(conn.from).toBe('node-a');
+      expect(conn.to).toBe('node-b');
+      expect(conn.style).toBe('arrow');
+    });
+
+    it('excludes connectors when both endpoints are outside viewport', () => {
+      const ops = {
+        getObjects: () => ({
+          a: { id: 'a', type: 'circle', x: 5000, y: 5000, width: 50, height: 50 },
+          b: { id: 'b', type: 'circle', x: 6000, y: 5000, width: 50, height: 50 },
+          c1: { id: 'c1', type: 'connector', fromId: 'a', toId: 'b' },
+        }),
+        viewportContext: { viewLeft: 0, viewTop: 0, viewRight: 800, viewBottom: 600 },
+      };
+      const result = collectViewportObjects(ops);
+      expect(result.find((o) => o.type === 'connector')).toBeUndefined();
+    });
+
+    it('includes connector when one endpoint is in viewport', () => {
+      const ops = {
+        getObjects: () => ({
+          a: { id: 'a', type: 'circle', x: 100, y: 100, width: 50, height: 50 },
+          b: { id: 'b', type: 'circle', x: 5000, y: 5000, width: 50, height: 50 },
+          c1: { id: 'c1', type: 'connector', fromId: 'a', toId: 'b', style: 'line' },
+        }),
+        viewportContext: { viewLeft: 0, viewTop: 0, viewRight: 800, viewBottom: 600 },
+      };
+      const result = collectViewportObjects(ops);
+      const conn = result.find((o) => o.type === 'connector');
+      expect(conn).toBeDefined();
+      expect(conn.style).toBe('line');
     });
   });
 

@@ -192,22 +192,49 @@ export const collectViewportObjects = (operations) => {
     viewRect = { x: vc.viewLeft - mx, y: vc.viewTop - my, width: w + mx * 2, height: h + my * 2 };
   }
 
-  return Object.values(objects)
-    .filter((obj) => !viewRect || intersectsRect(viewRect, getObjectBounds(obj)))
-    .map((obj) => {
-      const cx = (obj.width != null) ? obj.x + obj.width / 2 : obj.x;
-      const cy = (obj.height != null) ? obj.y + obj.height / 2 : obj.y;
-      const label = obj.label || uuidToLabel(obj.id);
-      const base = { label, id: obj.id, type: obj.type, x: cx, y: cy };
-      if (obj.width != null) base.width = obj.width;
-      if (obj.height != null) base.height = obj.height;
-      if (obj.text != null) base.text = obj.text.length > 300 ? obj.text.slice(0, 300) + '…' : obj.text;
-      if (obj.title != null) base.title = obj.title.length > 100 ? obj.title.slice(0, 100) + '…' : obj.title;
-      if (obj.color != null) base.color = obj.color;
-      if (obj.html != null) base.html = obj.html.slice(0, 200);
-      if (obj.zIndex != null) base.zIndex = obj.zIndex;
-      return base;
-    });
+  // Separate connectors from spatial objects
+  const allObjects = Object.values(objects);
+  const spatialObjects = allObjects.filter((obj) => obj.type !== 'connector');
+  const connectors = allObjects.filter((obj) => obj.type === 'connector');
+
+  // Filter spatial objects by viewport
+  const visibleSpatial = spatialObjects.filter(
+    (obj) => !viewRect || intersectsRect(viewRect, getObjectBounds(obj)),
+  );
+  const visibleIds = new Set(visibleSpatial.map((obj) => obj.id));
+
+  // Include connectors where at least one endpoint is in the viewport
+  const visibleConnectors = connectors.filter(
+    (c) => !viewRect || visibleIds.has(c.fromId) || visibleIds.has(c.toId),
+  );
+
+  const mapSpatial = (obj) => {
+    const cx = (obj.width != null) ? obj.x + obj.width / 2 : obj.x;
+    const cy = (obj.height != null) ? obj.y + obj.height / 2 : obj.y;
+    const label = obj.label || uuidToLabel(obj.id);
+    const base = { label, id: obj.id, type: obj.type, x: cx, y: cy };
+    if (obj.width != null) base.width = obj.width;
+    if (obj.height != null) base.height = obj.height;
+    if (obj.text != null) base.text = obj.text.length > 300 ? obj.text.slice(0, 300) + '…' : obj.text;
+    if (obj.title != null) base.title = obj.title.length > 100 ? obj.title.slice(0, 100) + '…' : obj.title;
+    if (obj.color != null) base.color = obj.color;
+    if (obj.html != null) base.html = obj.html.slice(0, 200);
+    if (obj.zIndex != null) base.zIndex = obj.zIndex;
+    return base;
+  };
+
+  const mapConnector = (obj) => {
+    const label = obj.label || uuidToLabel(obj.id);
+    const fromLabel = objects[obj.fromId]?.label || uuidToLabel(obj.fromId);
+    const toLabel = objects[obj.toId]?.label || uuidToLabel(obj.toId);
+    const base = { label, id: obj.id, type: 'connector', from: fromLabel, to: toLabel };
+    if (obj.style != null) base.style = obj.style;
+    if (obj.color != null) base.color = obj.color;
+    if (obj.zIndex != null) base.zIndex = obj.zIndex;
+    return base;
+  };
+
+  return [...visibleSpatial.map(mapSpatial), ...visibleConnectors.map(mapConnector)];
 };
 
 const extractBoardInfo = async (query, boardData, traceContext, onStream) => {
