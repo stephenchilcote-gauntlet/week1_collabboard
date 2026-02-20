@@ -28,13 +28,13 @@ describe('Toolbar', () => {
       />,
     );
 
-    fireEvent.click(getByText('Sticky Note'));
-    fireEvent.click(getByText('Rectangle'));
-    fireEvent.click(getByText('Circle'));
-    fireEvent.click(getByText('Line'));
-    fireEvent.click(getByText('Text'));
-    fireEvent.click(getByText('Frame'));
-    fireEvent.click(getByText('Connector'));
+    fireEvent.click(getByText('Sticky').closest('button'));
+    fireEvent.click(getByText('Rect').closest('button'));
+    fireEvent.click(getByText('Circle').closest('button'));
+    fireEvent.click(getByText('Line').closest('button'));
+    fireEvent.click(getByText('Text').closest('button'));
+    fireEvent.click(getByText('Frame').closest('button'));
+    fireEvent.click(getByText('Connect').closest('button'));
 
     expect(onCreateSticky).toHaveBeenCalled();
     expect(onCreateRectangle).toHaveBeenCalled();
@@ -70,39 +70,39 @@ describe('Toolbar', () => {
       />,
     );
 
-    const stickyBtn = getByText('Sticky Note');
+    const stickyBtn = getByText('Sticky').closest('button');
     expect(stickyBtn.style.background).toContain('transparent');
     fireEvent.mouseEnter(stickyBtn);
     expect(stickyBtn.style.background).toContain('rgba');
     fireEvent.mouseLeave(stickyBtn);
     expect(stickyBtn.style.background).toContain('transparent');
 
-    const rectBtn = getByText('Rectangle');
+    const rectBtn = getByText('Rect').closest('button');
     fireEvent.mouseEnter(rectBtn);
     expect(rectBtn.style.background).toContain('rgba');
     fireEvent.mouseLeave(rectBtn);
 
-    const circleBtn = getByText('Circle');
+    const circleBtn = getByText('Circle').closest('button');
     fireEvent.mouseEnter(circleBtn);
     expect(circleBtn.style.background).toContain('rgba');
     fireEvent.mouseLeave(circleBtn);
 
-    const lineBtn = getByText('Line');
+    const lineBtn = getByText('Line').closest('button');
     fireEvent.mouseEnter(lineBtn);
     expect(lineBtn.style.background).toContain('rgba');
     fireEvent.mouseLeave(lineBtn);
 
-    const textBtn = getByText('Text');
+    const textBtn = getByText('Text').closest('button');
     fireEvent.mouseEnter(textBtn);
     expect(textBtn.style.background).toContain('rgba');
     fireEvent.mouseLeave(textBtn);
 
-    const frameBtn = getByText('Frame');
+    const frameBtn = getByText('Frame').closest('button');
     fireEvent.mouseEnter(frameBtn);
     expect(frameBtn.style.background).toContain('rgba');
     fireEvent.mouseLeave(frameBtn);
 
-    const connectorBtn = getByText('Connector');
+    const connectorBtn = getByText('Connect').closest('button');
     fireEvent.mouseEnter(connectorBtn);
     expect(connectorBtn.style.background).toContain('rgba');
     fireEvent.mouseLeave(connectorBtn);
@@ -188,12 +188,12 @@ describe('Toolbar', () => {
       />,
     );
 
-    expect(getByText('Sticky Note').getAttribute('title')).toBe('Add sticky note (S)');
-    expect(getByText('Rectangle').getAttribute('title')).toBe('Add rectangle (R)');
-    expect(getByText('Circle').getAttribute('title')).toBe('Add circle (C)');
-    expect(getByText('Line').getAttribute('title')).toBe('Add line (L)');
-    expect(getByText('Text').getAttribute('title')).toBe('Add text (T)');
-    expect(getByText('Frame').getAttribute('title')).toBe('Add frame (F)');
-    expect(getByText('Connector').getAttribute('title')).toBe('Connector mode (K)');
+    expect(getByText('Sticky').closest('button').getAttribute('title')).toBe('Sticky (S)');
+    expect(getByText('Rect').closest('button').getAttribute('title')).toBe('Rect (R)');
+    expect(getByText('Circle').closest('button').getAttribute('title')).toBe('Circle (C)');
+    expect(getByText('Line').closest('button').getAttribute('title')).toBe('Line (L)');
+    expect(getByText('Text').closest('button').getAttribute('title')).toBe('Text (T)');
+    expect(getByText('Frame').closest('button').getAttribute('title')).toBe('Frame (F)');
+    expect(getByText('Connect').closest('button').getAttribute('title')).toBe('Connect (K)');
   });
 });

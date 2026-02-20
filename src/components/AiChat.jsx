@@ -237,10 +237,59 @@ export default function AiChat({ onSubmit, isLoading, progress, onNewConversatio
   const [isHistoryHovered, setIsHistoryHovered] = useState(false);
   const [isSendHovered, setIsSendHovered] = useState(false);
   const [hoveredConvId, setHoveredConvId] = useState(null);
-  const [thinkingScrollDuration, setThinkingScrollDuration] = useState(12);
   const textareaRef = useRef(null);
   const messagesEndRef = useRef(null);
-  const thinkingRateRef = useRef({ time: 0, length: 0, rate: 0 });
+  const thinkingScrollRef = useRef(null);
+  const subAgentScrollRef = useRef(null);
+  const [throttledThinking, setThrottledThinking] = useState('');
+  const [throttledSubAgent, setThrottledSubAgent] = useState('');
+  const thinkingTargetRef = useRef('');
+  const subAgentTargetRef = useRef('');
+
+  useEffect(() => { thinkingTargetRef.current = thinkingText; }, [thinkingText]);
+  useEffect(() => { subAgentTargetRef.current = subAgentThinkingText + subAgentOutputText; }, [subAgentThinkingText, subAgentOutputText]);
+
+  useEffect(() => {
+    if (!isThinking) { setThrottledThinking(''); return; }
+    const id = setInterval(() => {
+      setThrottledThinking(prev => {
+        const target = thinkingTargetRef.current;
+        if (prev.length >= target.length) return prev;
+        const pending = target.length - prev.length;
+        const reserve = 50;
+        const minChars = 3; // 60 chars/sec floor at 50ms tick
+        const chars = Math.max(minChars, Math.round(pending / (reserve / minChars)));
+        return target.slice(0, Math.min(target.length, prev.length + chars));
+      });
+    }, 50);
+    return () => clearInterval(id);
+  }, [isThinking]);
+
+  useEffect(() => {
+    if (!isSubAgentActive) { setThrottledSubAgent(''); return; }
+    const id = setInterval(() => {
+      setThrottledSubAgent(prev => {
+        const target = subAgentTargetRef.current;
+        if (prev.length >= target.length) return prev;
+        const pending = target.length - prev.length;
+        const reserve = 50;
+        const minChars = 3;
+        const chars = Math.max(minChars, Math.round(pending / (reserve / minChars)));
+        return target.slice(0, Math.min(target.length, prev.length + chars));
+      });
+    }, 50);
+    return () => clearInterval(id);
+  }, [isSubAgentActive]);
+
+  useEffect(() => {
+    const el = thinkingScrollRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [throttledThinking]);
+
+  useEffect(() => {
+    const el = subAgentScrollRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [throttledSubAgent]);
 
   useEffect(() => {
     if (isOpen && textareaRef.current) {
@@ -251,34 +300,6 @@ export default function AiChat({ onSubmit, isLoading, progress, onNewConversatio
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [messages, isLoading, streamingText, isThinking, isSubAgentActive]);
-
-  useEffect(() => {
-    if (!isThinking || !thinkingText) {
-      setThinkingScrollDuration(12);
-      thinkingRateRef.current = { time: 0, length: thinkingText.length, rate: 0 };
-      return;
-    }
-
-    const now = Date.now();
-    const { time, length, rate } = thinkingRateRef.current;
-    const deltaChars = thinkingText.length - length;
-    const deltaTime = time ? (now - time) / 1000 : 0;
-
-    if (deltaChars > 0 && deltaTime > 0.05) {
-      const instantRate = deltaChars / deltaTime;
-      const smoothedRate = rate ? rate * 0.6 + instantRate * 0.4 : instantRate;
-      const targetRate = Math.max(2, smoothedRate * 0.85);
-      const displayLength = Math.min(thinkingText.length, 300);
-      const duration = Math.min(30, Math.max(6, displayLength / targetRate));
-      setThinkingScrollDuration(duration);
-      thinkingRateRef.current = { time: now, length: thinkingText.length, rate: smoothedRate };
-      return;
-    }
-
-    if (!time) {
-      thinkingRateRef.current = { time: now, length: thinkingText.length, rate };
-    }
-  }, [thinkingText, isThinking]);
 
   const handleSubmit = useCallback((event) => {
     if (event) event.preventDefault();
@@ -331,7 +352,7 @@ export default function AiChat({ onSubmit, isLoading, progress, onNewConversatio
     : '';
 
   const hasInput = input.trim().length > 0;
-  const displayedThinkingText = thinkingText.slice(-300);
+  
 
   if (!isOpen) {
     return (
@@ -610,23 +631,21 @@ export default function AiChat({ onSubmit, isLoading, progress, onNewConversatio
               <span style={{ display: 'inline-block', animation: 'thinkingPulse 1.5s infinite ease-in-out' }}>💭</span>
               Thinking…
             </div>
-            <div style={{
+            <div ref={thinkingScrollRef} className="thinking-scroll" style={{
               height: 32,
-              overflow: 'hidden',
-              position: 'relative',
+              overflowX: 'scroll',
+              scrollBehavior: 'smooth',
               maskImage: 'linear-gradient(to right, transparent, black 8%, black 92%, transparent)',
               WebkitMaskImage: 'linear-gradient(to right, transparent, black 8%, black 92%, transparent)',
             }}>
               <div style={{
-                position: 'absolute',
                 whiteSpace: 'nowrap',
                 fontSize: 11,
                 color: '#818cf8',
                 lineHeight: '32px',
-                animation: `thinkingScroll ${thinkingScrollDuration}s linear infinite`,
-                right: 0,
+                width: 'fit-content',
               }}>
-                {displayedThinkingText}
+                {throttledThinking.slice(-300)}
               </div>
             </div>
           </div>
@@ -647,23 +666,21 @@ export default function AiChat({ onSubmit, isLoading, progress, onNewConversatio
               <span style={{ display: 'inline-block', animation: 'thinkingPulse 1.5s infinite ease-in-out' }}>🔍</span>
               Searching board…
             </div>
-            <div style={{
+            <div ref={subAgentScrollRef} className="thinking-scroll" style={{
               height: 32,
-              overflow: 'hidden',
-              position: 'relative',
+              overflowX: 'scroll',
+              scrollBehavior: 'smooth',
               maskImage: 'linear-gradient(to right, transparent, black 8%, black 92%, transparent)',
               WebkitMaskImage: 'linear-gradient(to right, transparent, black 8%, black 92%, transparent)',
             }}>
               <div style={{
-                position: 'absolute',
                 whiteSpace: 'nowrap',
                 fontSize: 11,
                 color: '#34d399',
                 lineHeight: '32px',
-                animation: `thinkingScroll ${thinkingScrollDuration}s linear infinite`,
-                right: 0,
+                width: 'fit-content',
               }}>
-                {(subAgentThinkingText + subAgentOutputText).slice(-300)}
+                {throttledSubAgent.slice(-300)}
               </div>
             </div>
           </div>
@@ -812,13 +829,11 @@ export default function AiChat({ onSubmit, isLoading, progress, onNewConversatio
 
       {/* Keyframe animations */}
       <style>{`
+        .thinking-scroll { scrollbar-width: none; }
+        .thinking-scroll::-webkit-scrollbar { display: none; }
         @keyframes typingBounce {
           0%, 80%, 100% { transform: translateY(0); }
           40% { transform: translateY(-6px); }
-        }
-        @keyframes thinkingScroll {
-          0% { transform: translateX(100%); }
-          100% { transform: translateX(-100%); }
         }
         @keyframes thinkingPulse {
           0%, 100% { opacity: 1; transform: scale(1); }
