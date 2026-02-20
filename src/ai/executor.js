@@ -97,7 +97,7 @@ const handleCreate = async (input, operations) => {
   return { ok: true, label: created.label, type: input.type };
 };
 
-const handleUpdate = async (input, operations) => {
+const handleUpdateSingle = async (input, operations) => {
   const { updateObject, getObjects } = operations;
   const objects = getObjects();
   const res = resolveId(input.objectId, objects);
@@ -150,6 +150,21 @@ const handleUpdate = async (input, operations) => {
   return { ok: true, label: target.label, movedChildren: movedChildren.length };
 };
 
+const handleUpdate = async (input, operations) => {
+  if (input.updates) {
+    const results = [];
+    for (const entry of input.updates) {
+      results.push(await handleUpdateSingle(entry, operations));
+    }
+    const failed = results.filter((r) => !r.ok);
+    if (failed.length > 0) {
+      return { ok: false, error: `${failed.length}/${results.length} updates failed.`, results };
+    }
+    return { ok: true, updated: results.length, results };
+  }
+  return handleUpdateSingle(input, operations);
+};
+
 const handleDelete = async (input, operations) => {
   const objects = operations.getObjects();
   const res = resolveId(input.objectId, objects);
@@ -195,9 +210,9 @@ const extractBoardInfo = async (query, boardData, traceContext, onStream) => {
   const fullContext = { ...(traceContext || {}), callType: 'tool', toolName: 'getBoardState' };
   const useStreaming = !!onStream;
   const reqBody = {
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-sonnet-4-6',
     max_tokens: 8192,
-    system: 'You are a board-reading assistant. You receive a JSON snapshot of whiteboard objects and a query. Return ONLY the requested information as concise JSON. Preserve all object labels and IDs so the caller can reference them. Do not add commentary.',
+    system: 'You provide the information requested by this prompt: as concise JSON. Default to returning all fields, except UUIDs - return those only if requested.',
     messages: [
       {
         role: 'user',

@@ -23,7 +23,7 @@ const parseRetryAfter = (response) => {
 };
 
 const buildRequestBody = (messages, systemPrompt) => ({
-  model: 'claude-sonnet-4-5-20250929',
+  model: 'claude-sonnet-4-6',
   max_tokens: 16000,
   system: systemPrompt,
   tools: TOOLS,

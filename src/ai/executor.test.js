@@ -197,6 +197,50 @@ describe('executeTool', () => {
       expect(result.ok).toBe(false);
       expect(result.error).toContain('No updates');
     });
+
+    it('batch updates multiple objects', async () => {
+      const ops = makeOperations({
+        a: { id: 'a', color: '#000', x: 0, y: 0 },
+        b: { id: 'b', color: '#000', x: 10, y: 10 },
+      });
+      const result = await executeTool('updateObject', {
+        updates: [
+          { objectId: 'a', color: '#FF0000' },
+          { objectId: 'b', color: '#00FF00' },
+        ],
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.updated).toBe(2);
+      expect(result.results).toHaveLength(2);
+      expect(ops.updateObject).toHaveBeenCalledWith('a', { color: '#FF0000' });
+      expect(ops.updateObject).toHaveBeenCalledWith('b', { color: '#00FF00' });
+    });
+
+    it('batch reports partial failures', async () => {
+      const ops = makeOperations({
+        a: { id: 'a', color: '#000' },
+      });
+      const result = await executeTool('updateObject', {
+        updates: [
+          { objectId: 'a', color: '#FF0000' },
+          { objectId: 'ghost', color: '#00FF00' },
+        ],
+      }, ops);
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('1/2');
+      expect(result.results[0].ok).toBe(true);
+      expect(result.results[1].ok).toBe(false);
+    });
+
+    it('batch with single entry works like single mode', async () => {
+      const ops = makeOperations({ a: { id: 'a', text: 'Old' } });
+      const result = await executeTool('updateObject', {
+        updates: [{ objectId: 'a', text: 'New' }],
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.updated).toBe(1);
+      expect(ops.updateObject).toHaveBeenCalledWith('a', { text: 'New' });
+    });
   });
 
   describe('deleteObject', () => {

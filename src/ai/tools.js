@@ -27,11 +27,11 @@ export const TOOLS = [
   },
   {
     name: 'updateObject',
-    description: 'Update any properties of an existing object by ID.',
+    description: 'Update one or many objects. Pass objectId + properties for a single update, or pass a "updates" array for batch updates.',
     input_schema: {
       type: 'object',
       properties: {
-        objectId: { type: 'string', description: 'Label or UUID of the object to update' },
+        objectId: { type: 'string', description: 'Label or UUID of the object to update (single mode)' },
         x: { type: 'number', description: 'Center x coordinate' },
         y: { type: 'number', description: 'Center y coordinate' },
         width: { type: 'number' },
@@ -40,8 +40,26 @@ export const TOOLS = [
         color: { type: 'string' },
         title: { type: 'string' },
         zIndex: { type: 'number', description: 'Stack order. Higher = in front.' },
+        updates: {
+          type: 'array',
+          description: 'Batch mode: array of updates, each with objectId and properties to change.',
+          items: {
+            type: 'object',
+            properties: {
+              objectId: { type: 'string', description: 'Label or UUID of the object to update' },
+              x: { type: 'number' },
+              y: { type: 'number' },
+              width: { type: 'number' },
+              height: { type: 'number' },
+              text: { type: 'string' },
+              color: { type: 'string' },
+              title: { type: 'string' },
+              zIndex: { type: 'number' },
+            },
+            required: ['objectId'],
+          },
+        },
       },
-      required: ['objectId'],
     },
   },
   {
