@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
+import React from 'react';
 import AiChat from './AiChat.jsx';
 
 // Mock scrollIntoView
@@ -314,6 +315,52 @@ describe('AiChat', () => {
       fireEvent.click(screen.getByTestId('ai-chat-toggle'));
       const messages = screen.getByTestId('ai-chat-messages');
       expect(messages.style.overflowY).toBe('auto');
+    });
+  });
+
+  // --- Markdown rendering tests ---
+  describe('markdown rendering', () => {
+    it('renders bold text containing inline code correctly', () => {
+      // Test the actual bug: bold text with inline code should be recognized
+      // We'll test this by rendering the component with markdown content
+      const messages = [{ role: 'assistant', text: '**bold with `code` inside**' }];
+      render(<AiChat onSubmit={vi.fn()} isLoading={false} progress={null} messages={messages} />);
+      fireEvent.click(screen.getByTestId('ai-chat-toggle'));
+      
+      // Look for the strong element within the message
+      const strongElement = document.querySelector('strong');
+      expect(strongElement).toBeTruthy();
+      expect(strongElement.textContent).toContain('bold with');
+      expect(strongElement.textContent).toContain('code');
+      expect(strongElement.textContent).toContain('inside');
+      
+      // Look for the code element within the message
+      const codeElement = document.querySelector('code');
+      expect(codeElement).toBeTruthy();
+      expect(codeElement.textContent).toBe('code');
+      
+      // Verify the code element is inside the strong element
+      expect(strongElement.contains(codeElement)).toBe(true);
+    });
+
+    it('renders simple bold text correctly', () => {
+      const messages = [{ role: 'assistant', text: '**simple bold**' }];
+      render(<AiChat onSubmit={vi.fn()} isLoading={false} progress={null} messages={messages} />);
+      fireEvent.click(screen.getByTestId('ai-chat-toggle'));
+      
+      const strongElement = document.querySelector('strong');
+      expect(strongElement).toBeTruthy();
+      expect(strongElement.textContent).toBe('simple bold');
+    });
+
+    it('renders inline code correctly', () => {
+      const messages = [{ role: 'assistant', text: 'text with `code` here' }];
+      render(<AiChat onSubmit={vi.fn()} isLoading={false} progress={null} messages={messages} />);
+      fireEvent.click(screen.getByTestId('ai-chat-toggle'));
+      
+      const codeElement = document.querySelector('code');
+      expect(codeElement).toBeTruthy();
+      expect(codeElement.textContent).toBe('code');
     });
   });
 });

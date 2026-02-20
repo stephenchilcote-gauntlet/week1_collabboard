@@ -174,17 +174,62 @@ const renderMarkdown = (text) => {
 // Inline markdown: bold, italic, inline code, links
 const renderInline = (text) => {
   const parts = [];
-  // Split by inline code first to avoid processing markdown inside code
+  // Process formatting first, then handle inline code within formatted segments
+  const formatRegex = /(\*\*(.+?)\*\*|\*(.+?)\*|\[([^\]]+)]\(([^)]+)\))/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = formatRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(...processTextWithInlineCode(text.slice(lastIndex, match.index), parts.length));
+    }
+    
+    if (match[2]) {
+      // Bold text - process inline code within it
+      parts.push(
+        <strong key={`b${parts.length}`}>
+          {processTextWithInlineCode(match[2], parts.length)}
+        </strong>
+      );
+    } else if (match[3]) {
+      // Italic text - process inline code within it
+      parts.push(
+        <em key={`i${parts.length}`}>
+          {processTextWithInlineCode(match[3], parts.length)}
+        </em>
+      );
+    } else if (match[4] && match[5]) {
+      // Links - process inline code within link text
+      parts.push(
+        <a key={`a${parts.length}`} href={match[5]} target="_blank" rel="noopener noreferrer"
+           style={{ color: 'inherit', textDecoration: 'underline' }}>
+          {processTextWithInlineCode(match[4], parts.length)}
+        </a>
+      );
+    }
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(...processTextWithInlineCode(text.slice(lastIndex), parts.length));
+  }
+
+  return parts.length === 1 && typeof parts[0] === 'string' ? parts[0] : parts;
+};
+
+// Helper function to process inline code within text segments
+const processTextWithInlineCode = (text, keyOffset) => {
+  const parts = [];
   const codeRegex = /`([^`]+)`/g;
   let lastIndex = 0;
   let match;
 
   while ((match = codeRegex.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      parts.push(...renderFormattingSegments(text.slice(lastIndex, match.index), parts.length));
+      parts.push(text.slice(lastIndex, match.index));
     }
     parts.push(
-      <code key={`c${parts.length}`} style={{
+      <code key={`c${keyOffset + parts.length}`} style={{
         background: '#e5e7eb', padding: '1px 5px', borderRadius: 3,
         fontSize: '0.9em', fontFamily: 'ui-monospace, monospace',
       }}>
@@ -195,36 +240,10 @@ const renderInline = (text) => {
   }
 
   if (lastIndex < text.length) {
-    parts.push(...renderFormattingSegments(text.slice(lastIndex), parts.length));
+    parts.push(text.slice(lastIndex));
   }
 
-  return parts.length === 1 && typeof parts[0] === 'string' ? parts[0] : parts;
-};
-
-const renderFormattingSegments = (text, keyOffset) => {
-  const parts = [];
-  // Bold then italic
-  const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|\[([^\]]+)]\(([^)]+)\))/g;
-  let lastIdx = 0;
-  let m;
-
-  while ((m = regex.exec(text)) !== null) {
-    if (m.index > lastIdx) parts.push(text.slice(lastIdx, m.index));
-    if (m[2]) {
-      parts.push(<strong key={`b${keyOffset + parts.length}`}>{m[2]}</strong>);
-    } else if (m[3]) {
-      parts.push(<em key={`i${keyOffset + parts.length}`}>{m[3]}</em>);
-    } else if (m[4] && m[5]) {
-      parts.push(
-        <a key={`a${keyOffset + parts.length}`} href={m[5]} target="_blank" rel="noopener noreferrer"
-           style={{ color: 'inherit', textDecoration: 'underline' }}>{m[4]}</a>
-      );
-    }
-    lastIdx = m.index + m[0].length;
-  }
-
-  if (lastIdx < text.length) parts.push(text.slice(lastIdx));
-  return parts;
+  return parts.length === 1 ? parts[0] : parts;
 };
 
 export default function AiChat({ onSubmit, isLoading, progress, onNewConversation, messages = [], conversationList = [], onLoadConversation, activeConversationId, streamingText = '', thinkingText = '', isThinking = false, subAgentThinkingText = '', subAgentOutputText = '', isSubAgentActive = false }) {
