@@ -75,11 +75,26 @@ export const TOOLS = [
   },
   {
     name: 'getBoardState',
-    description: 'Query the board state using freeform natural language. A sub-agent reads the viewport and extracts only what your query asks for. Send a detailed subquery that includes all relevant context — object types, labels, colors, spatial relationships, or any other details needed for the sub-agent to answer it correctly.',
+    description: 'Query the board state. Use "query" for natural language (sub-agent), or "filter"/"fields" for fast structured queries that bypass the LLM. Text filter uses case-insensitive substring match.',
     input_schema: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'Freeform natural language subquery for the board analysis sub-agent (e.g., "list all sticky notes with their text and colors", "find objects near coordinates (200,300)", "count the frames and their titles"). Be specific about what you need extracted.' },
+        query: { type: 'string', description: 'Freeform natural language subquery for the board analysis sub-agent.' },
+        filter: {
+          type: 'object',
+          description: 'Structured filter — match objects by property values (e.g., {"type":"sticky","color":"#FFD700"}). Text filter uses substring match.',
+          properties: {
+            type: { type: 'string' },
+            color: { type: 'string' },
+            text: { type: 'string', description: 'Substring match (case-insensitive)' },
+            label: { type: 'string' },
+          },
+        },
+        fields: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Select specific fields to return (e.g., ["label","x","y","color"]). Omit to return all fields.',
+        },
       },
       required: ['query'],
     },
@@ -94,6 +109,23 @@ export const TOOLS = [
         objectIds: { type: 'array', items: { type: 'string' }, description: 'Labels or UUIDs of objects the frame should enclose.' },
       },
       required: ['frameId', 'objectIds'],
+    },
+  },
+  {
+    name: 'layoutObjects',
+    description: 'Arrange objects using layout algorithms. Modes: "grid" (arrange in rows/columns), "distributeH"/"distributeV" (equal spacing), "align" (align edges/centers).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        mode: { type: 'string', enum: ['grid', 'distributeH', 'distributeV', 'align'], description: 'Layout algorithm to apply.' },
+        objectIds: { type: 'array', items: { type: 'string' }, description: 'Labels or UUIDs of objects to arrange.' },
+        columns: { type: 'number', description: 'Grid mode: number of columns (default: sqrt of count).' },
+        spacing: { type: 'number', description: 'Grid mode: gap between objects in pixels (default: 30).' },
+        startX: { type: 'number', description: 'Grid mode: top-left x of the grid (default: first object x).' },
+        startY: { type: 'number', description: 'Grid mode: top-left y of the grid (default: first object y).' },
+        alignment: { type: 'string', enum: ['left', 'center', 'right', 'top', 'middle', 'bottom'], description: 'Align mode: edge or center to align to.' },
+      },
+      required: ['mode', 'objectIds'],
     },
   },
 ];

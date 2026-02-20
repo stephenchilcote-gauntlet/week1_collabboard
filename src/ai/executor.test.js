@@ -283,6 +283,75 @@ describe('executeTool', () => {
       expect(fetchBody.messages[0].content).toContain('s1');
     });
 
+    it('filters objects before sending to sub-agent', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          content: [{ type: 'text', text: '{"found":1}' }],
+        }),
+      });
+      const ops = makeOperations({
+        s1: { id: 's1', type: 'sticky', x: 10, y: 20, width: 200, height: 160, text: 'Hello', color: '#FFD700' },
+        s2: { id: 's2', type: 'sticky', x: 50, y: 60, width: 200, height: 160, text: 'World', color: '#FF0000' },
+        r1: { id: 'r1', type: 'rectangle', x: 100, y: 100, width: 240, height: 160, color: '#FFD700' },
+      });
+      const result = await executeTool('getBoardState', {
+        query: 'list matching stickies',
+        filter: { type: 'sticky', color: '#FFD700' },
+      }, ops);
+      expect(result.ok).toBe(true);
+      // Sub-agent should only receive the filtered object
+      const fetchBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const boardData = fetchBody.messages[0].content;
+      expect(boardData).toContain('Hello');
+      expect(boardData).not.toContain('World');
+      expect(boardData).not.toContain('rectangle');
+    });
+
+    it('selects fields before sending to sub-agent', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          content: [{ type: 'text', text: '{"ok":true}' }],
+        }),
+      });
+      const ops = makeOperations({
+        s1: { id: 's1', type: 'sticky', x: 10, y: 20, width: 200, height: 160, text: 'Hi', color: '#FFD700' },
+      });
+      const result = await executeTool('getBoardState', {
+        query: 'summarize',
+        filter: { type: 'sticky' },
+        fields: ['label', 'color'],
+      }, ops);
+      expect(result.ok).toBe(true);
+      const fetchBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const boardData = fetchBody.messages[0].content;
+      expect(boardData).toContain('color');
+      expect(boardData).not.toContain('"x"');
+    });
+
+    it('text filter uses case-insensitive substring match', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          content: [{ type: 'text', text: '{"count":1}' }],
+        }),
+      });
+      const ops = makeOperations({
+        s1: { id: 's1', type: 'sticky', x: 0, y: 0, width: 200, height: 160, text: 'Hello World' },
+        s2: { id: 's2', type: 'sticky', x: 300, y: 0, width: 200, height: 160, text: 'Goodbye' },
+      });
+      const result = await executeTool('getBoardState', {
+        query: 'list them',
+        filter: { text: 'hello' },
+      }, ops);
+      expect(result.ok).toBe(true);
+      const fetchBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const boardData = fetchBody.messages[0].content;
+      expect(boardData).toContain('Hello World');
+      expect(boardData).not.toContain('Goodbye');
+    });
+
     it('falls back to raw data on sub-agent failure', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
@@ -383,6 +452,170 @@ describe('executeTool', () => {
       const boardData = fetchBody.messages[0].content;
       // The board data sent to the sub-agent should contain a label
       expect(boardData).toMatch(/[a-z]+ [a-z]+ [a-z]+/);
+    });
+  });
+
+  describe('layoutObjects', () => {
+    it('arranges objects in a grid', async () => {
+      const ops = makeOperations({
+        a: { id: 'a', x: 0, y: 0, width: 200, height: 160 },
+        b: { id: 'b', x: 0, y: 0, width: 200, height: 160 },
+        c: { id: 'c', x: 0, y: 0, width: 200, height: 160 },
+        d: { id: 'd', x: 0, y: 0, width: 200, height: 160 },
+      });
+      const result = await executeTool('layoutObjects', {
+        mode: 'grid', objectIds: ['a', 'b', 'c', 'd'], columns: 2, spacing: 20, startX: 100, startY: 100,
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.arranged).toBe(4);
+      expect(result.columns).toBe(2);
+      expect(ops.updateObject).toHaveBeenCalledWith('a', { x: 100, y: 100 });
+      expect(ops.updateObject).toHaveBeenCalledWith('b', { x: 320, y: 100 });
+      expect(ops.updateObject).toHaveBeenCalledWith('c', { x: 100, y: 280 });
+      expect(ops.updateObject).toHaveBeenCalledWith('d', { x: 320, y: 280 });
+    });
+
+    it('grid defaults columns to sqrt of count', async () => {
+      const ops = makeOperations({
+        a: { id: 'a', x: 0, y: 0, width: 100, height: 100 },
+        b: { id: 'b', x: 0, y: 0, width: 100, height: 100 },
+        c: { id: 'c', x: 0, y: 0, width: 100, height: 100 },
+        d: { id: 'd', x: 0, y: 0, width: 100, height: 100 },
+      });
+      const result = await executeTool('layoutObjects', {
+        mode: 'grid', objectIds: ['a', 'b', 'c', 'd'], startX: 0, startY: 0,
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.columns).toBe(2); // sqrt(4) = 2
+    });
+
+    it('aligns objects left', async () => {
+      const ops = makeOperations({
+        a: { id: 'a', x: 50, y: 0, width: 200, height: 100 },
+        b: { id: 'b', x: 100, y: 200, width: 200, height: 100 },
+        c: { id: 'c', x: 30, y: 400, width: 200, height: 100 },
+      });
+      const result = await executeTool('layoutObjects', {
+        mode: 'align', objectIds: ['a', 'b', 'c'], alignment: 'left',
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.arranged).toBe(3);
+      expect(result.alignment).toBe('left');
+      // All should align to x=30 (the minimum)
+      expect(ops.updateObject).toHaveBeenCalledWith('a', { x: 30 });
+      expect(ops.updateObject).toHaveBeenCalledWith('b', { x: 30 });
+      expect(ops.updateObject).toHaveBeenCalledWith('c', { x: 30 });
+    });
+
+    it('aligns objects center horizontally', async () => {
+      const ops = makeOperations({
+        a: { id: 'a', x: 0, y: 0, width: 100, height: 100 },
+        b: { id: 'b', x: 200, y: 200, width: 200, height: 100 },
+      });
+      const result = await executeTool('layoutObjects', {
+        mode: 'align', objectIds: ['a', 'b'], alignment: 'center',
+      }, ops);
+      expect(result.ok).toBe(true);
+      // center = (0 + 400) / 2 = 200
+      expect(ops.updateObject).toHaveBeenCalledWith('a', { x: 150 }); // 200 - 100/2
+      expect(ops.updateObject).toHaveBeenCalledWith('b', { x: 100 }); // 200 - 200/2
+    });
+
+    it('distributes objects horizontally', async () => {
+      const ops = makeOperations({
+        a: { id: 'a', x: 0, y: 0, width: 100, height: 100 },
+        b: { id: 'b', x: 500, y: 0, width: 100, height: 100 },
+        c: { id: 'c', x: 200, y: 0, width: 100, height: 100 },
+      });
+      const result = await executeTool('layoutObjects', {
+        mode: 'distributeH', objectIds: ['a', 'b', 'c'],
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.arranged).toBe(3);
+      expect(result.mode).toBe('distributeH');
+    });
+
+    it('distributes objects vertically', async () => {
+      const ops = makeOperations({
+        a: { id: 'a', x: 0, y: 0, width: 100, height: 100 },
+        b: { id: 'b', x: 0, y: 400, width: 100, height: 100 },
+      });
+      const result = await executeTool('layoutObjects', {
+        mode: 'distributeV', objectIds: ['a', 'b'],
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.arranged).toBe(2);
+    });
+
+    it('fails with no objectIds', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('layoutObjects', { mode: 'grid', objectIds: [] }, ops);
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('No objectIds');
+    });
+
+    it('fails with no mode', async () => {
+      const ops = makeOperations({ a: { id: 'a' } });
+      const result = await executeTool('layoutObjects', { objectIds: ['a'] }, ops);
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('mode');
+    });
+
+    it('fails with unknown mode', async () => {
+      const ops = makeOperations({ a: { id: 'a' } });
+      const result = await executeTool('layoutObjects', { mode: 'spiral', objectIds: ['a'] }, ops);
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('spiral');
+    });
+
+    it('fails with non-existent objectId', async () => {
+      const ops = makeOperations({ a: { id: 'a' } });
+      const result = await executeTool('layoutObjects', { mode: 'grid', objectIds: ['a', 'ghost'] }, ops);
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('ghost');
+    });
+
+    it('distribute fails with fewer than 2 objects', async () => {
+      const ops = makeOperations({
+        a: { id: 'a', x: 0, y: 0, width: 100, height: 100 },
+      });
+      const result = await executeTool('layoutObjects', {
+        mode: 'distributeH', objectIds: ['a'],
+      }, ops);
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('2 objects');
+    });
+
+    it('resolves objects by label', async () => {
+      const ops = makeOperations();
+      const a = await executeTool('createObject', { type: 'sticky', x: 0, y: 0 }, ops);
+      const b = await executeTool('createObject', { type: 'sticky', x: 300, y: 0 }, ops);
+      const result = await executeTool('layoutObjects', {
+        mode: 'align', objectIds: [a.label, b.label], alignment: 'top',
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.arranged).toBe(2);
+    });
+  });
+
+  describe('error messages', () => {
+    it('not-found error includes board object count and types', async () => {
+      const ops = makeOperations({
+        s1: { id: 's1', type: 'sticky' },
+        r1: { id: 'r1', type: 'rectangle' },
+      });
+      const result = await executeTool('updateObject', { objectId: 'missing', text: 'x' }, ops);
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('2 object(s)');
+      expect(result.error).toContain('sticky');
+      expect(result.error).toContain('rectangle');
+    });
+
+    it('not-found on empty board shows 0 objects', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('deleteObject', { objectId: 'ghost' }, ops);
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('0 object(s)');
     });
   });
 

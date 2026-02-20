@@ -38,7 +38,9 @@ const resolveId = (value, objects) => {
     const details = matches.map((o) => ({ id: o.id, label: o.label, type: o.type }));
     return { ok: false, error: `Multiple objects match label "${value}".`, matches: details };
   }
-  return { ok: false, error: `Object "${value}" not found.` };
+  const count = Object.keys(objects).length;
+  const types = [...new Set(Object.values(objects).map((o) => o.type))].join(', ');
+  return { ok: false, error: `Object "${value}" not found. Board has ${count} object(s)${types ? ` (types: ${types})` : ''}.` };
 };
 
 const handleCreate = async (input, operations) => {
@@ -258,8 +260,42 @@ const extractBoardInfo = async (query, boardData, traceContext, onStream) => {
   return text;
 };
 
+const applyStructuredQuery = (objects, filter, fields) => {
+  let result = objects;
+  if (filter && typeof filter === 'object') {
+    result = result.filter((obj) => {
+      for (const [key, val] of Object.entries(filter)) {
+        if (val === undefined || val === null) continue;
+        if (key === 'text' && typeof val === 'string') {
+          if (!obj.text || !obj.text.toLowerCase().includes(val.toLowerCase())) return false;
+        } else if (obj[key] !== val) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }
+  if (fields && Array.isArray(fields) && fields.length > 0) {
+    result = result.map((obj) => {
+      const picked = {};
+      for (const f of fields) {
+        if (obj[f] !== undefined) picked[f] = obj[f];
+      }
+      return picked;
+    });
+  }
+  return result;
+};
+
 const handleGetBoardState = async (input, operations, traceContext, onStream) => {
-  const summary = collectViewportObjects(operations);
+  let summary = collectViewportObjects(operations);
+  const total = summary.length;
+
+  // Apply structured filters first (AND with the natural language query)
+  if (input.filter || input.fields) {
+    summary = applyStructuredQuery(summary, input.filter, input.fields);
+  }
+
   const query = input.query;
   try {
     const extracted = await extractBoardInfo(query, summary, traceContext, onStream);
@@ -306,6 +342,113 @@ const handleFitFrameToObjects = async (input, operations) => {
   return { ok: true, label: frame.label };
 };
 
+const resolveMultipleIds = (ids, objects) => {
+  const resolved = [];
+  for (const id of ids) {
+    const res = resolveId(id, objects);
+    if (!res.ok) return { ok: false, error: res.error, matches: res.matches };
+    resolved.push(objects[res.id]);
+  }
+  return { ok: true, targets: resolved };
+};
+
+const handleLayoutObjects = async (input, operations) => {
+  const { updateObject, getObjects } = operations;
+  const objects = getObjects();
+  const { mode, objectIds } = input;
+
+  if (!objectIds || objectIds.length === 0) return { ok: false, error: 'No objectIds provided.' };
+  if (!mode) return { ok: false, error: 'No layout mode specified. Use "grid", "distributeH", "distributeV", or "align".' };
+
+  const resolved = resolveMultipleIds(objectIds, objects);
+  if (!resolved.ok) return resolved;
+  const targets = resolved.targets;
+
+  if (mode === 'grid') {
+    const columns = input.columns ?? Math.ceil(Math.sqrt(targets.length));
+    const spacing = input.spacing ?? 30;
+    const startX = input.startX ?? targets[0].x ?? 0;
+    const startY = input.startY ?? targets[0].y ?? 0;
+    const promises = targets.map((obj, i) => {
+      const col = i % columns;
+      const row = Math.floor(i / columns);
+      const w = obj.width ?? 200;
+      const h = obj.height ?? 160;
+      const x = startX + col * (w + spacing);
+      const y = startY + row * (h + spacing);
+      return updateObject(obj.id, { x, y });
+    });
+    await Promise.all(promises);
+    return { ok: true, arranged: targets.length, mode: 'grid', columns };
+  }
+
+  if (mode === 'distributeH' || mode === 'distributeV') {
+    if (targets.length < 2) return { ok: false, error: 'Need at least 2 objects to distribute.' };
+    const horizontal = mode === 'distributeH';
+    const sorted = [...targets].sort((a, b) => horizontal ? (a.x - b.x) : (a.y - b.y));
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    const startPos = horizontal ? first.x : first.y;
+    const lastSize = horizontal ? (last.width ?? 0) : (last.height ?? 0);
+    const endPos = horizontal ? (last.x + lastSize) : (last.y + lastSize);
+    const totalSpan = endPos - startPos;
+    const totalObjSize = sorted.reduce((sum, o) => sum + (horizontal ? (o.width ?? 0) : (o.height ?? 0)), 0);
+    const gap = targets.length > 1 ? (totalSpan - totalObjSize) / (targets.length - 1) : 0;
+    let pos = startPos;
+    const promises = sorted.map((obj) => {
+      const size = horizontal ? (obj.width ?? 0) : (obj.height ?? 0);
+      const update = horizontal ? { x: pos } : { y: pos };
+      pos += size + gap;
+      return updateObject(obj.id, update);
+    });
+    await Promise.all(promises);
+    return { ok: true, arranged: targets.length, mode };
+  }
+
+  if (mode === 'align') {
+    const alignment = input.alignment ?? 'left';
+    const bounds = targets.map((o) => getObjectBounds(o));
+    let ref;
+    switch (alignment) {
+      case 'left': ref = Math.min(...bounds.map((b) => b.x)); break;
+      case 'right': ref = Math.max(...bounds.map((b) => b.x + b.width)); break;
+      case 'center': {
+        const minX = Math.min(...bounds.map((b) => b.x));
+        const maxX = Math.max(...bounds.map((b) => b.x + b.width));
+        ref = (minX + maxX) / 2;
+        break;
+      }
+      case 'top': ref = Math.min(...bounds.map((b) => b.y)); break;
+      case 'bottom': ref = Math.max(...bounds.map((b) => b.y + b.height)); break;
+      case 'middle': {
+        const minY = Math.min(...bounds.map((b) => b.y));
+        const maxY = Math.max(...bounds.map((b) => b.y + b.height));
+        ref = (minY + maxY) / 2;
+        break;
+      }
+      default: return { ok: false, error: `Unknown alignment "${alignment}". Use left, center, right, top, middle, or bottom.` };
+    }
+    const promises = targets.map((obj) => {
+      const w = obj.width ?? 0;
+      const h = obj.height ?? 0;
+      let update;
+      switch (alignment) {
+        case 'left': update = { x: ref }; break;
+        case 'right': update = { x: ref - w }; break;
+        case 'center': update = { x: ref - w / 2 }; break;
+        case 'top': update = { y: ref }; break;
+        case 'bottom': update = { y: ref - h }; break;
+        case 'middle': update = { y: ref - h / 2 }; break;
+      }
+      return updateObject(obj.id, update);
+    });
+    await Promise.all(promises);
+    return { ok: true, arranged: targets.length, mode: 'align', alignment };
+  }
+
+  return { ok: false, error: `Unknown layout mode "${mode}". Use "grid", "distributeH", "distributeV", or "align".` };
+};
+
 export const executeTool = async (toolName, input, operations, traceContext, onStream) => {
   console.log(`[AI Tool] ${toolName}`, input);
   let result;
@@ -316,6 +459,7 @@ export const executeTool = async (toolName, input, operations, traceContext, onS
       case 'deleteObject': result = await handleDelete(input, operations); break;
       case 'getBoardState': result = await handleGetBoardState(input, operations, traceContext, onStream); break;
       case 'fitFrameToObjects': result = await handleFitFrameToObjects(input, operations); break;
+      case 'layoutObjects': result = await handleLayoutObjects(input, operations); break;
       default: result = { ok: false, error: `Unknown tool: ${toolName}` };
     }
   } catch (err) {
