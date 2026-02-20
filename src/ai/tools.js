@@ -57,11 +57,11 @@ export const TOOLS = [
   },
   {
     name: 'getBoardState',
-    description: 'Query the board for specific information. A sub-agent reads the viewport and returns only what you asked for. Your query MUST include all relevant context — object types, labels, colors, spatial relationships, or any other details needed to answer your question. Be specific.',
+    description: 'Query the board state using freeform natural language. A sub-agent reads the viewport and extracts only what your query asks for. Send a detailed subquery that includes all relevant context — object types, labels, colors, spatial relationships, or any other details needed for the sub-agent to answer it correctly.',
     input_schema: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'What information you need from the board. Include all relevant context (e.g. "list all sticky notes with their text and colors", "find objects near coordinates (200,300)", "count the frames and their titles").' },
+        query: { type: 'string', description: 'Freeform natural language subquery for the board analysis sub-agent (e.g., "list all sticky notes with their text and colors", "find objects near coordinates (200,300)", "count the frames and their titles"). Be specific about what you need extracted.' },
       },
       required: ['query'],
     },

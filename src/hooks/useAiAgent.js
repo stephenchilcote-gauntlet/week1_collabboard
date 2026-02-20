@@ -99,6 +99,9 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
   const [streamingText, setStreamingText] = useState('');
   const [thinkingText, setThinkingText] = useState('');
   const [isThinking, setIsThinking] = useState(false);
+  const [subAgentThinkingText, setSubAgentThinkingText] = useState('');
+  const [subAgentOutputText, setSubAgentOutputText] = useState('');
+  const [isSubAgentActive, setIsSubAgentActive] = useState(false);
   const objectsRef = useRef(objects);
   objectsRef.current = objects;
   const historyRef = useRef([]);
@@ -106,6 +109,8 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
   const pendingDisplayRef = useRef([]);
   const streamingTextRef = useRef('');
   const thinkingTextRef = useRef('');
+  const subAgentThinkingTextRef = useRef('');
+  const subAgentOutputTextRef = useRef('');
 
   const flushDisplayMessages = useCallback(() => {
     setDisplayMessages([...displayHistoryRef.current, ...pendingDisplayRef.current]);
@@ -164,8 +169,13 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
     setStreamingText('');
     setThinkingText('');
     setIsThinking(false);
+    setSubAgentThinkingText('');
+    setSubAgentOutputText('');
+    setIsSubAgentActive(false);
     streamingTextRef.current = '';
     thinkingTextRef.current = '';
+    subAgentThinkingTextRef.current = '';
+    subAgentOutputTextRef.current = '';
 
     const operations = {
       createObject,
@@ -267,6 +277,14 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
         }
         streamingTextRef.current += event.delta;
         setStreamingText(streamingTextRef.current);
+      } else if (event.type === 'subAgentThinking') {
+        setIsSubAgentActive(true);
+        subAgentThinkingTextRef.current += event.delta;
+        setSubAgentThinkingText(subAgentThinkingTextRef.current);
+      } else if (event.type === 'subAgentText') {
+        setIsSubAgentActive(true);
+        subAgentOutputTextRef.current += event.delta;
+        setSubAgentOutputText(subAgentOutputTextRef.current);
       } else if (event.type === 'toolStart') {
         commitStreamingText();
         pendingAssistantIndex = null;
@@ -277,6 +295,11 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
           streamingTextRef.current = '';
           setStreamingText('');
         }
+        setIsSubAgentActive(false);
+        setSubAgentThinkingText('');
+        setSubAgentOutputText('');
+        subAgentThinkingTextRef.current = '';
+        subAgentOutputTextRef.current = '';
         const pendingLabel = TOOL_PENDING_LABELS[event.name] || event.name;
         pendingDisplayRef.current = [
           ...pendingDisplayRef.current,
@@ -290,6 +313,11 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
         thinkingTextRef.current = '';
         streamingTextRef.current = '';
         setStreamingText('');
+        setIsSubAgentActive(false);
+        setSubAgentThinkingText('');
+        setSubAgentOutputText('');
+        subAgentThinkingTextRef.current = '';
+        subAgentOutputTextRef.current = '';
         pendingAssistantIndex = null;
       }
     };
@@ -300,8 +328,13 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
       setStreamingText('');
       setThinkingText('');
       setIsThinking(false);
+      setSubAgentThinkingText('');
+      setSubAgentOutputText('');
+      setIsSubAgentActive(false);
       streamingTextRef.current = '';
       thinkingTextRef.current = '';
+      subAgentThinkingTextRef.current = '';
+      subAgentOutputTextRef.current = '';
 
       // Use the full API-format messages from runAgent (includes tool_use/tool_result blocks)
       const normalizedMessages = Array.isArray(result.messages) ? [...result.messages] : [];
@@ -329,8 +362,13 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
       setStreamingText('');
       setThinkingText('');
       setIsThinking(false);
+      setSubAgentThinkingText('');
+      setSubAgentOutputText('');
+      setIsSubAgentActive(false);
       streamingTextRef.current = '';
       thinkingTextRef.current = '';
+      subAgentThinkingTextRef.current = '';
+      subAgentOutputTextRef.current = '';
       pendingDisplayRef.current = [...pendingDisplayRef.current, { role: 'assistant', text: errorText }];
       setDisplayMessages([...displayHistoryRef.current, ...pendingDisplayRef.current]);
     } finally {
@@ -339,5 +377,5 @@ export const useAiAgent = ({ objects, createObject, updateObject, deleteObject, 
     }
   }, [createObject, updateObject, deleteObject, viewport, cursors, userId, userName, conversationId, boardName, selectedIds, flushDisplayMessages]);
 
-  return { submit, isLoading, progress, conversationId, startNewConversation, loadConversation, displayMessages, conversationList, streamingText, thinkingText, isThinking };
+  return { submit, isLoading, progress, conversationId, startNewConversation, loadConversation, displayMessages, conversationList, streamingText, thinkingText, isThinking, subAgentThinkingText, subAgentOutputText, isSubAgentActive };
 };

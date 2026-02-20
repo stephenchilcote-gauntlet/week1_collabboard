@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-// Lightweight markdown renderer — handles bold, italic, inline code, code blocks, headers, lists, links
+// Lightweight markdown renderer — handles bold, italic, inline code, code blocks, headers, lists, links, tables
 const renderMarkdown = (text) => {
   if (!text) return null;
   const lines = text.split('\n');
@@ -68,6 +68,87 @@ const renderMarkdown = (text) => {
         </div>
       );
       i += 1;
+      continue;
+    }
+
+    // Tables
+    const tableMatch = line.match(/^\|(.+)\|$/);
+    if (tableMatch) {
+      const tableData = [];
+      let tableLines = [line];
+      i += 1;
+      
+      // Check if next line is separator (|---|---|)
+      if (i < lines.length && lines[i].match(/^\|[\s\-\|:]+\|$/)) {
+        tableLines.push(lines[i]);
+        i += 1;
+        
+        // Collect remaining table rows
+        while (i < lines.length && lines[i].match(/^\|(.+)\|$/)) {
+          tableLines.push(lines[i]);
+          i += 1;
+        }
+      }
+      
+      // Parse table data
+      const headerRow = tableLines[0].split('|').slice(1, -1).map(cell => cell.trim());
+      const hasSeparator = tableLines.length > 1 && tableLines[1].match(/^\|[\s\-\|:]+\|$/);
+      const dataRows = hasSeparator ? tableLines.slice(2) : tableLines.slice(1);
+      
+      const parsedDataRows = dataRows.map(row => 
+        row.split('|').slice(1, -1).map(cell => cell.trim())
+      );
+      
+      // Determine column alignment from separator row
+      let alignments = [];
+      if (hasSeparator) {
+        const separatorCells = tableLines[1].split('|').slice(1, -1);
+        alignments = separatorCells.map(cell => {
+          if (cell.startsWith(':') && cell.endsWith(':')) return 'center';
+          if (cell.endsWith(':')) return 'right';
+          return 'left';
+        });
+      }
+      
+      elements.push(
+        <table key={elements.length} style={{
+          borderCollapse: 'collapse',
+          margin: '8px 0',
+          fontSize: 12,
+          width: '100%',
+        }}>
+          <thead>
+            <tr>
+              {headerRow.map((cell, cellIndex) => (
+                <th key={cellIndex} style={{
+                  border: '1px solid #d1d5db',
+                  padding: '6px 8px',
+                  background: '#f9fafb',
+                  fontWeight: 600,
+                  textAlign: alignments[cellIndex] || 'left',
+                }}>
+                  {renderInline(cell)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {parsedDataRows.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {row.map((cell, cellIndex) => (
+                  <td key={cellIndex} style={{
+                    border: '1px solid #d1d5db',
+                    padding: '6px 8px',
+                    textAlign: alignments[cellIndex] || 'left',
+                  }}>
+                    {renderInline(cell)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      );
       continue;
     }
 
@@ -146,7 +227,7 @@ const renderFormattingSegments = (text, keyOffset) => {
   return parts;
 };
 
-export default function AiChat({ onSubmit, isLoading, progress, onNewConversation, messages = [], conversationList = [], onLoadConversation, activeConversationId, streamingText = '', thinkingText = '', isThinking = false }) {
+export default function AiChat({ onSubmit, isLoading, progress, onNewConversation, messages = [], conversationList = [], onLoadConversation, activeConversationId, streamingText = '', thinkingText = '', isThinking = false, subAgentThinkingText = '', subAgentOutputText = '', isSubAgentActive = false }) {
   const [input, setInput] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -169,7 +250,7 @@ export default function AiChat({ onSubmit, isLoading, progress, onNewConversatio
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [messages, isLoading, streamingText, isThinking]);
+  }, [messages, isLoading, streamingText, isThinking, isSubAgentActive]);
 
   useEffect(() => {
     if (!isThinking || !thinkingText) {
@@ -546,6 +627,43 @@ export default function AiChat({ onSubmit, isLoading, progress, onNewConversatio
                 right: 0,
               }}>
                 {displayedThinkingText}
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Sub-agent thinking indicator — board search */}
+        {isLoading && isSubAgentActive && (subAgentThinkingText || subAgentOutputText) && (
+          <div
+            data-testid="ai-chat-subagent-thinking"
+            style={{
+              alignSelf: 'flex-start',
+              width: '85%',
+              background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)',
+              borderRadius: '4px 16px 16px 16px',
+              padding: '8px 14px',
+            }}
+          >
+            <div style={{ fontSize: 10, color: '#059669', fontWeight: 600, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ display: 'inline-block', animation: 'thinkingPulse 1.5s infinite ease-in-out' }}>🔍</span>
+              Searching board…
+            </div>
+            <div style={{
+              height: 32,
+              overflow: 'hidden',
+              position: 'relative',
+              maskImage: 'linear-gradient(to right, transparent, black 8%, black 92%, transparent)',
+              WebkitMaskImage: 'linear-gradient(to right, transparent, black 8%, black 92%, transparent)',
+            }}>
+              <div style={{
+                position: 'absolute',
+                whiteSpace: 'nowrap',
+                fontSize: 11,
+                color: '#34d399',
+                lineHeight: '32px',
+                animation: `thinkingScroll ${thinkingScrollDuration}s linear infinite`,
+                right: 0,
+              }}>
+                {(subAgentThinkingText + subAgentOutputText).slice(-300)}
               </div>
             </div>
           </div>

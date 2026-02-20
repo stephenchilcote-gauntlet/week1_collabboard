@@ -11,6 +11,7 @@ import {
 import { getObjectBounds, intersectsRect, containsRect } from '../utils/coordinates.js';
 import { uuidToLabel } from './labels.js';
 import { AI_PROXY_URL } from './config.js';
+import { parseStream } from './streamParser.js';
 
 const TYPE_DEFAULTS = {
   sticky: { width: 200, height: 160, color: DEFAULT_STICKY_COLOR },
@@ -181,8 +182,8 @@ export const collectViewportObjects = (operations) => {
       const base = { label, id: obj.id, type: obj.type, x: cx, y: cy };
       if (obj.width != null) base.width = obj.width;
       if (obj.height != null) base.height = obj.height;
-      if (obj.text != null) base.text = obj.text;
-      if (obj.title != null) base.title = obj.title;
+      if (obj.text != null) base.text = obj.text.length > 300 ? obj.text.slice(0, 300) + '…' : obj.text;
+      if (obj.title != null) base.title = obj.title.length > 100 ? obj.title.slice(0, 100) + '…' : obj.title;
       if (obj.color != null) base.color = obj.color;
       if (obj.html != null) base.html = obj.html.slice(0, 200);
       if (obj.zIndex != null) base.zIndex = obj.zIndex;
@@ -190,43 +191,63 @@ export const collectViewportObjects = (operations) => {
     });
 };
 
-const extractBoardInfo = async (query, boardData, traceContext) => {
+const extractBoardInfo = async (query, boardData, traceContext, onStream) => {
   const fullContext = { ...(traceContext || {}), callType: 'tool', toolName: 'getBoardState' };
+  const useStreaming = !!onStream;
+  const reqBody = {
+    model: 'claude-sonnet-4-5-20250929',
+    max_tokens: 8192,
+    system: 'You are a board-reading assistant. You receive a JSON snapshot of whiteboard objects and a query. Return ONLY the requested information as concise JSON. Preserve all object labels and IDs so the caller can reference them. Do not add commentary.',
+    messages: [
+      {
+        role: 'user',
+        content: `Board objects:\n${JSON.stringify(boardData)}\n\nQuery: ${query}`,
+      },
+    ],
+  };
+  if (useStreaming) {
+    reqBody.stream = true;
+    reqBody.thinking = { type: 'enabled', budget_tokens: 5000 };
+  }
   const response = await fetch(AI_PROXY_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Trace-Context': JSON.stringify(fullContext),
     },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 2048,
-      system: 'You are a board-reading assistant. You receive a JSON snapshot of whiteboard objects and a query. Return ONLY the requested information as concise JSON. Preserve all object labels and IDs so the caller can reference them. Do not add commentary.',
-      messages: [
-        {
-          role: 'user',
-          content: `Board objects:\n${JSON.stringify(boardData)}\n\nQuery: ${query}`,
-        },
-      ],
-    }),
+    body: JSON.stringify(reqBody),
   });
   if (!response.ok) {
     const text = await response.text();
     throw new Error(`Board query LLM error ${response.status}: ${text}`);
   }
+  if (useStreaming) {
+    const streamCallbacks = {
+      onThinking: (delta) => onStream({ type: 'subAgentThinking', delta }),
+      onText: (delta) => onStream({ type: 'subAgentText', delta }),
+    };
+    const result = await parseStream(response, streamCallbacks);
+    let text = result.content
+      ?.filter((b) => b.type === 'text')
+      .map((b) => b.text)
+      .join('') || '';
+    if (result.stop_reason === 'max_tokens') text += '\n[WARNING: response was truncated]';
+    return text;
+  }
   const result = await response.json();
-  const text = result.content
+  let text = result.content
     ?.filter((b) => b.type === 'text')
     .map((b) => b.text)
     .join('') || '';
+  if (result.stop_reason === 'max_tokens') text += '\n[WARNING: response was truncated]';
   return text;
 };
 
-const handleGetBoardState = async (input, operations, traceContext) => {
+const handleGetBoardState = async (input, operations, traceContext, onStream) => {
   const summary = collectViewportObjects(operations);
   const query = input.query;
   try {
-    const extracted = await extractBoardInfo(query, summary, traceContext);
+    const extracted = await extractBoardInfo(query, summary, traceContext, onStream);
     return { ok: true, result: extracted };
   } catch (err) {
     console.error('[AI Tool] getBoardState sub-agent failed, returning raw data:', err);
@@ -270,7 +291,7 @@ const handleFitFrameToObjects = async (input, operations) => {
   return { ok: true, label: frame.label };
 };
 
-export const executeTool = async (toolName, input, operations, traceContext) => {
+export const executeTool = async (toolName, input, operations, traceContext, onStream) => {
   console.log(`[AI Tool] ${toolName}`, input);
   let result;
   try {
@@ -278,7 +299,7 @@ export const executeTool = async (toolName, input, operations, traceContext) => 
       case 'createObject': result = await handleCreate(input, operations); break;
       case 'updateObject': result = await handleUpdate(input, operations); break;
       case 'deleteObject': result = await handleDelete(input, operations); break;
-      case 'getBoardState': result = await handleGetBoardState(input, operations, traceContext); break;
+      case 'getBoardState': result = await handleGetBoardState(input, operations, traceContext, onStream); break;
       case 'fitFrameToObjects': result = await handleFitFrameToObjects(input, operations); break;
       default: result = { ok: false, error: `Unknown tool: ${toolName}` };
     }

@@ -157,7 +157,7 @@ export const runAgent = async (userMessage, operations, onProgress, viewportCont
       onProgress?.({ phase: 'executing', tool: block.name, round });
       let result;
       try {
-        result = await executeTool(block.name, block.input, operations, traceContext);
+        result = await executeTool(block.name, block.input, operations, traceContext, onStream);
       } catch (err) {
         console.error(`[AI Agent] Tool ${block.name} threw:`, err);
         result = { ok: false, error: err.message || 'Unknown tool error' };

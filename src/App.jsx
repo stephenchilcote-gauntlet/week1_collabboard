@@ -687,6 +687,9 @@ const BoardShell = ({ user, boardName, onNavigateHome }) => {
         streamingText={aiAgent.streamingText}
         thinkingText={aiAgent.thinkingText}
         isThinking={aiAgent.isThinking}
+        subAgentThinkingText={aiAgent.subAgentThinkingText}
+        subAgentOutputText={aiAgent.subAgentOutputText}
+        isSubAgentActive={aiAgent.isSubAgentActive}
       />
       <div style={{
         position: 'fixed',
