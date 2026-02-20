@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "perf:markdown": "npx vitest run perf/markdown-goals.test.jsx",
     "perf:auth": "node perf/auth-setup.js",
     "perf": "npx playwright test --config perf/playwright.config.js",
     "perf:headed": "npx playwright test --config perf/playwright.config.js --headed"
@@ -17,7 +18,8 @@
   "dependencies": {
     "firebase": "^12.9.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
