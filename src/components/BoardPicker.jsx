@@ -1,7 +1,13 @@
 import { useState } from 'react';
+import { WORDLIST } from '../ai/labels.js';
+
+function randomBoardName() {
+  const pick = () => WORDLIST[Math.floor(Math.random() * WORDLIST.length)];
+  return `${pick()}-${pick()}-${pick()}`;
+}
 
 export default function BoardPicker({ onSelectBoard }) {
-  const [boardName, setBoardName] = useState('');
+  const [boardName, setBoardName] = useState(randomBoardName);
   const [goHovered, setGoHovered] = useState(false);
   const [defaultHovered, setDefaultHovered] = useState(false);
 

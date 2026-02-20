@@ -3,7 +3,7 @@
 // Compresses 16 UUID bytes to 3 via XOR, maps each to a word from a 256-word list.
 // Collision rate: ~1 in 16.7M — negligible for viewport-sized object sets.
 
-const WORDLIST = [
+export const WORDLIST = [
   'ack', 'alabama', 'alanine', 'alaska', 'alpha', 'angel', 'apart', 'april',
   'arizona', 'arkansas', 'artist', 'asparagus', 'aspen', 'august', 'autumn',
   'avocado', 'bacon', 'bakerloo', 'batman', 'beer', 'berlin', 'beryllium',

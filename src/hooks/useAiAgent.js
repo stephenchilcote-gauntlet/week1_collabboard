@@ -69,6 +69,7 @@ const TOOL_LABELS = {
   deleteObject: 'Deleted',
   getBoardState: 'Read board',
   fitFrameToObjects: 'Fit frame',
+  layoutObjects: 'Laid out objects',
 };
 
 const TOOL_PENDING_LABELS = {
@@ -77,6 +78,7 @@ const TOOL_PENDING_LABELS = {
   deleteObject: 'Deleting…',
   getBoardState: 'Reading board…',
   fitFrameToObjects: 'Fitting frame…',
+  layoutObjects: 'Laying out objects…',
 };
 
 const summarizeToolCall = (name, input) => {
