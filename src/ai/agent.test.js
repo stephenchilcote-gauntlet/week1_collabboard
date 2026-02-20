@@ -126,16 +126,26 @@ describe('runAgent', () => {
   });
 
   it('calls onProgress callback during execution', async () => {
+    // Round 1: LLM requests getBoardState
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         stop_reason: 'tool_use',
         content: [
-          { type: 'tool_use', id: 'tu1', name: 'getBoardState', input: {} },
+          { type: 'tool_use', id: 'tu1', name: 'getBoardState', input: { query: 'list all objects' } },
         ],
       }),
     });
 
+    // Sub-agent call for getBoardState extraction
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        content: [{ type: 'text', text: '{"objects":[]}' }],
+      }),
+    });
+
+    // Round 2: LLM final response
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -171,15 +181,15 @@ describe('runAgent', () => {
       json: async () => ({
         stop_reason: 'tool_use',
         content: [
-          { type: 'tool_use', id: 'tu1', name: 'getBoardState', input: {} },
+          { type: 'tool_use', id: 'tu1', name: 'createObject', input: { type: 'sticky', text: 'X', x: 0, y: 0 } },
         ],
       }),
     });
 
     const ops = makeOps();
     await runAgent('Loop forever', ops);
-    // MAX_TOOL_ROUNDS is 10, so we get 10 calls
-    expect(mockFetch).toHaveBeenCalledTimes(10);
+    // MAX_TOOL_ROUNDS is 40, one LLM call per round
+    expect(mockFetch).toHaveBeenCalledTimes(40);
   });
 
   it('forwards traceContext as X-Trace-Context header', async () => {
@@ -197,6 +207,6 @@ describe('runAgent', () => {
 
     const fetchCall = mockFetch.mock.calls[0];
     const headers = fetchCall[1].headers;
-    expect(headers['X-Trace-Context']).toBe(JSON.stringify(traceContext));
+    expect(headers['X-Trace-Context']).toBe(JSON.stringify({ ...traceContext, callType: 'conversation' }));
   });
 });

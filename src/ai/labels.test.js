@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { test, fc } from '@fast-check/vitest';
 import { uuidToLabel } from './labels.js';
-import { executeTool } from './executor.js';
+import { executeTool, collectViewportObjects } from './executor.js';
 
 // ---------------------------------------------------------------------------
 // Arbitraries
@@ -125,13 +125,12 @@ describe('executor label round-trip', () => {
   );
 
   test.prop([arbObjectType, fc.integer({ min: -5000, max: 5000 }), fc.integer({ min: -5000, max: 5000 })])(
-    'getBoardState includes the label from creation',
+    'collectViewportObjects includes the label from creation',
     async (type, x, y) => {
       const ops = makeOperations();
       const created = await executeTool('createObject', { type, x, y }, ops);
-      const state = await executeTool('getBoardState', {}, ops);
-      expect(state.ok).toBe(true);
-      const found = state.objects.find((o) => o.label === created.label);
+      const objects = collectViewportObjects(ops);
+      const found = objects.find((o) => o.label === created.label);
       expect(found).toBeDefined();
       expect(found.type).toBe(type);
     },
@@ -274,7 +273,7 @@ describe('resolveId edge cases', () => {
     expect(delB.label).toBe(label);
   });
 
-  it('real collision pair: getBoardState shows both objects with same label + different UUIDs', async () => {
+  it('real collision pair: collectViewportObjects shows both objects with same label + different UUIDs', async () => {
     const uuidA = 'bbb13f7a-966e-4c7c-aea5-4bac3ce98505';
     const uuidB = 'ef4f8cd0-25b9-4029-9316-0f2f3b069b34';
     const label = uuidToLabel(uuidA);
@@ -284,9 +283,8 @@ describe('resolveId edge cases', () => {
       [uuidB]: { id: uuidB, label, type: 'rectangle', x: 300, y: 0, width: 240, height: 160 },
     });
 
-    const state = await executeTool('getBoardState', {}, ops);
-    expect(state.ok).toBe(true);
-    const withLabel = state.objects.filter((o) => o.label === label);
+    const objects = collectViewportObjects(ops);
+    const withLabel = objects.filter((o) => o.label === label);
     expect(withLabel).toHaveLength(2);
     // Both have the same label but different UUIDs — agent can tell them apart via id field
     const ids = withLabel.map((o) => o.id).sort();
@@ -313,18 +311,17 @@ describe('resolveId edge cases', () => {
 // getBoardState label properties
 // ---------------------------------------------------------------------------
 
-describe('getBoardState label properties', () => {
+describe('collectViewportObjects label properties', () => {
   test.prop([fc.array(arbObjectType, { minLength: 1, maxLength: 20 })])(
-    'every object in getBoardState has a valid 3-word label',
+    'every object has a valid 3-word label',
     async (types) => {
       const ops = makeOperations();
       for (const type of types) {
         await executeTool('createObject', { type, x: 0, y: 0 }, ops);
       }
-      const state = await executeTool('getBoardState', {}, ops);
-      expect(state.ok).toBe(true);
-      expect(state.count).toBe(types.length);
-      for (const obj of state.objects) {
+      const objects = collectViewportObjects(ops);
+      expect(objects).toHaveLength(types.length);
+      for (const obj of objects) {
         expect(obj.label).toBeDefined();
         expect(obj.label.split(' ')).toHaveLength(3);
         for (const word of obj.label.split(' ')) {
@@ -335,7 +332,7 @@ describe('getBoardState label properties', () => {
   );
 
   test.prop([fc.array(arbObjectType, { minLength: 1, maxLength: 10 })])(
-    'getBoardState labels match creation labels',
+    'labels match creation labels',
     async (types) => {
       const ops = makeOperations();
       const createdLabels = [];
@@ -343,8 +340,8 @@ describe('getBoardState label properties', () => {
         const r = await executeTool('createObject', { type, x: 0, y: 0 }, ops);
         createdLabels.push(r.label);
       }
-      const state = await executeTool('getBoardState', {}, ops);
-      const stateLabels = state.objects.map((o) => o.label);
+      const objects = collectViewportObjects(ops);
+      const stateLabels = objects.map((o) => o.label);
       for (const label of createdLabels) {
         expect(stateLabels).toContain(label);
       }
@@ -352,14 +349,14 @@ describe('getBoardState label properties', () => {
   );
 
   test.prop([arbUuid, arbObjectType])(
-    'legacy objects without label field get a computed label in getBoardState',
+    'legacy objects without label field get a computed label',
     async (uuid, type) => {
       const id = uuid.replace(/-/g, '');
       const ops = makeOperations({
         [id]: { id, type, x: 0, y: 0, width: 100, height: 100 },
       });
-      const state = await executeTool('getBoardState', {}, ops);
-      const obj = state.objects[0];
+      const objects = collectViewportObjects(ops);
+      const obj = objects[0];
       expect(obj.label).toBe(uuidToLabel(id));
       expect(obj.label.split(' ')).toHaveLength(3);
     },

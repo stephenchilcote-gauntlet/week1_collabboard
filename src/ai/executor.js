@@ -10,6 +10,7 @@ import {
 } from '../utils/colors.js';
 import { getObjectBounds, intersectsRect, containsRect } from '../utils/coordinates.js';
 import { uuidToLabel } from './labels.js';
+import { AI_PROXY_URL } from './config.js';
 
 const TYPE_DEFAULTS = {
   sticky: { width: 200, height: 160, color: DEFAULT_STICKY_COLOR },
@@ -157,7 +158,7 @@ const handleDelete = async (input, operations) => {
   return { ok: true, label };
 };
 
-const handleGetBoardState = (operations) => {
+export const collectViewportObjects = (operations) => {
   const objects = operations.getObjects();
   const vc = operations.viewportContext;
 
@@ -171,7 +172,7 @@ const handleGetBoardState = (operations) => {
     viewRect = { x: vc.viewLeft - mx, y: vc.viewTop - my, width: w + mx * 2, height: h + my * 2 };
   }
 
-  const summary = Object.values(objects)
+  return Object.values(objects)
     .filter((obj) => !viewRect || intersectsRect(viewRect, getObjectBounds(obj)))
     .map((obj) => {
       const cx = (obj.width != null) ? obj.x + obj.width / 2 : obj.x;
@@ -187,7 +188,50 @@ const handleGetBoardState = (operations) => {
       if (obj.zIndex != null) base.zIndex = obj.zIndex;
       return base;
     });
-  return { ok: true, objects: summary, count: summary.length };
+};
+
+const extractBoardInfo = async (query, boardData, traceContext) => {
+  const fullContext = { ...(traceContext || {}), callType: 'tool', toolName: 'getBoardState' };
+  const response = await fetch(AI_PROXY_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Trace-Context': JSON.stringify(fullContext),
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-5-20250929',
+      max_tokens: 2048,
+      system: 'You are a board-reading assistant. You receive a JSON snapshot of whiteboard objects and a query. Return ONLY the requested information as concise JSON. Preserve all object labels and IDs so the caller can reference them. Do not add commentary.',
+      messages: [
+        {
+          role: 'user',
+          content: `Board objects:\n${JSON.stringify(boardData)}\n\nQuery: ${query}`,
+        },
+      ],
+    }),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Board query LLM error ${response.status}: ${text}`);
+  }
+  const result = await response.json();
+  const text = result.content
+    ?.filter((b) => b.type === 'text')
+    .map((b) => b.text)
+    .join('') || '';
+  return text;
+};
+
+const handleGetBoardState = async (input, operations, traceContext) => {
+  const summary = collectViewportObjects(operations);
+  const query = input.query;
+  try {
+    const extracted = await extractBoardInfo(query, summary, traceContext);
+    return { ok: true, result: extracted };
+  } catch (err) {
+    console.error('[AI Tool] getBoardState sub-agent failed, returning raw data:', err);
+    return { ok: true, objects: summary, count: summary.length };
+  }
 };
 
 const handleFitFrameToObjects = async (input, operations) => {
@@ -226,7 +270,7 @@ const handleFitFrameToObjects = async (input, operations) => {
   return { ok: true, label: frame.label };
 };
 
-export const executeTool = async (toolName, input, operations) => {
+export const executeTool = async (toolName, input, operations, traceContext) => {
   console.log(`[AI Tool] ${toolName}`, input);
   let result;
   try {
@@ -234,7 +278,7 @@ export const executeTool = async (toolName, input, operations) => {
       case 'createObject': result = await handleCreate(input, operations); break;
       case 'updateObject': result = await handleUpdate(input, operations); break;
       case 'deleteObject': result = await handleDelete(input, operations); break;
-      case 'getBoardState': result = handleGetBoardState(operations); break;
+      case 'getBoardState': result = await handleGetBoardState(input, operations, traceContext); break;
       case 'fitFrameToObjects': result = await handleFitFrameToObjects(input, operations); break;
       default: result = { ok: false, error: `Unknown tool: ${toolName}` };
     }

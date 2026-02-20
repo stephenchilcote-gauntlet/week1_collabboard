@@ -1,5 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeTool } from './executor.js';
+
+const mockFetch = vi.fn();
+vi.stubGlobal('fetch', mockFetch);
 
 const makeOperations = (objects = {}) => {
   const store = { ...objects };
@@ -212,30 +215,43 @@ describe('executeTool', () => {
   });
 
   describe('getBoardState', () => {
-    it('returns summary of all objects', async () => {
+    beforeEach(() => {
+      mockFetch.mockReset();
+    });
+
+    it('sends query to sub-agent and returns extracted result', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          content: [{ type: 'text', text: '{"stickies":[{"label":"a b c","text":"Hello"}]}' }],
+        }),
+      });
       const ops = makeOperations({
         s1: { id: 's1', type: 'sticky', x: 10, y: 20, text: 'Hello', color: '#FFD700' },
         r1: { id: 'r1', type: 'rectangle', x: 50, y: 60, width: 100, height: 80 },
       });
-      const result = await executeTool('getBoardState', {}, ops);
+      const result = await executeTool('getBoardState', { query: 'list all sticky notes' }, ops);
       expect(result.ok).toBe(true);
-      expect(result.count).toBe(2);
-      expect(result.objects).toHaveLength(2);
+      expect(result.result).toContain('Hello');
+      // Verify the sub-agent was called with board data and query
+      const fetchBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(fetchBody.messages[0].content).toContain('list all sticky notes');
+      expect(fetchBody.messages[0].content).toContain('s1');
     });
 
-    it('returns empty for empty board', async () => {
-      const ops = makeOperations();
-      const result = await executeTool('getBoardState', {}, ops);
-      expect(result.ok).toBe(true);
-      expect(result.count).toBe(0);
-    });
-
-    it('truncates embed HTML', async () => {
-      const ops = makeOperations({
-        e1: { id: 'e1', type: 'embed', x: 0, y: 0, html: 'x'.repeat(500) },
+    it('falls back to raw data on sub-agent failure', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: async () => 'Internal Server Error',
       });
-      const result = await executeTool('getBoardState', {}, ops);
-      expect(result.objects.find((o) => o.id === 'e1').html.length).toBe(200);
+      const ops = makeOperations({
+        s1: { id: 's1', type: 'sticky', x: 10, y: 20, text: 'Hello' },
+      });
+      const result = await executeTool('getBoardState', { query: 'list all objects' }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.objects).toHaveLength(1);
+      expect(result.count).toBe(1);
     });
   });
 
@@ -308,12 +324,21 @@ describe('executeTool', () => {
       expect(result.ok).toBe(true);
     });
 
-    it('getBoardState includes labels', async () => {
+    it('getBoardState sub-agent receives objects with labels', async () => {
+      mockFetch.mockReset();
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          content: [{ type: 'text', text: '{"found":true}' }],
+        }),
+      });
       const ops = makeOperations();
       await executeTool('createObject', { type: 'sticky', text: 'Hi', x: 0, y: 0 }, ops);
-      const result = await executeTool('getBoardState', {}, ops);
-      expect(result.objects[0].label).toBeDefined();
-      expect(result.objects[0].label).toMatch(/^[a-z]+ [a-z]+ [a-z]+$/);
+      await executeTool('getBoardState', { query: 'find sticky notes' }, ops);
+      const fetchBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const boardData = fetchBody.messages[0].content;
+      // The board data sent to the sub-agent should contain a label
+      expect(boardData).toMatch(/[a-z]+ [a-z]+ [a-z]+/);
     });
   });
 

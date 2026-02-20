@@ -68,6 +68,8 @@ export default {
           userName: traceContext.userName || undefined,
           boardName: traceContext.boardName || undefined,
           streaming: isStreaming,
+          callType: traceContext.callType || undefined,
+          toolName: traceContext.toolName || undefined,
         },
       });
 

@@ -674,6 +674,75 @@ describe('useAiAgent', () => {
       });
     });
 
+    it('preserves assistant text between multiple tool rounds after reconciliation', async () => {
+      // This is THE regression test: simulates a multi-round tool loop where the
+      // assistant streams text before each tool call. After runAgent resolves,
+      // displayMessages is rebuilt from result.messages — this must still contain
+      // all intermediate text.
+      const apiMessages = [
+        { role: 'user', content: 'Create two stickies' },
+        {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: "I'll create the first sticky." },
+            { type: 'tool_use', id: 'tu1', name: 'createObject', input: { type: 'sticky', text: 'One' } },
+          ],
+        },
+        {
+          role: 'user',
+          content: [{ type: 'tool_result', tool_use_id: 'tu1', content: '{"ok":true,"objectId":"obj-1"}' }],
+        },
+        {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'Now the second one.' },
+            { type: 'tool_use', id: 'tu2', name: 'createObject', input: { type: 'sticky', text: 'Two' } },
+          ],
+        },
+        {
+          role: 'user',
+          content: [{ type: 'tool_result', tool_use_id: 'tu2', content: '{"ok":true,"objectId":"obj-2"}' }],
+        },
+        { role: 'assistant', content: 'Done! Created both stickies.' },
+      ];
+
+      mockRunAgent.mockImplementationOnce((_msg, _ops, _prog, _vp, _hist, onToolCall, onStream) => {
+        // Round 1: text then tool
+        onStream?.({ type: 'text', delta: "I'll create the first sticky." });
+        onStream?.({ type: 'toolStart', name: 'createObject' });
+        onToolCall?.('createObject', { type: 'sticky', text: 'One' }, { ok: true, objectId: 'obj-1' });
+        onStream?.({ type: 'done' });
+
+        // Round 2: text then tool
+        onStream?.({ type: 'text', delta: 'Now the second one.' });
+        onStream?.({ type: 'toolStart', name: 'createObject' });
+        onToolCall?.('createObject', { type: 'sticky', text: 'Two' }, { ok: true, objectId: 'obj-2' });
+        onStream?.({ type: 'done' });
+
+        // Final text
+        onStream?.({ type: 'text', delta: 'Done! Created both stickies.' });
+        onStream?.({ type: 'done' });
+
+        return { text: 'Done! Created both stickies.', messages: apiMessages };
+      });
+
+      const { result } = renderHook(() => useAiAgent(makeProps()));
+
+      await act(async () => {
+        await result.current.submit('Create two stickies');
+      });
+
+      const msgs = result.current.displayMessages;
+      // Must contain BOTH intermediate text messages, not just the final one
+      const assistantTexts = msgs.filter((m) => m.role === 'assistant').map((m) => m.text);
+      expect(assistantTexts).toContain("I'll create the first sticky.");
+      expect(assistantTexts).toContain('Now the second one.');
+      expect(assistantTexts).toContain('Done! Created both stickies.');
+
+      const toolMsgs = msgs.filter((m) => m.role === 'tool');
+      expect(toolMsgs).toHaveLength(2);
+    });
+
     it('commits streaming text when streaming ends without tools', async () => {
       let resolveRunAgent;
       const runAgentPromise = new Promise((resolve) => {

@@ -57,10 +57,13 @@ export const TOOLS = [
   },
   {
     name: 'getBoardState',
-    description: 'Get objects in/near the user\'s viewport (visible area + 25% margin). Objects far off-screen are excluded.',
+    description: 'Query the board for specific information. A sub-agent reads the viewport and returns only what you asked for. Your query MUST include all relevant context — object types, labels, colors, spatial relationships, or any other details needed to answer your question. Be specific.',
     input_schema: {
       type: 'object',
-      properties: {},
+      properties: {
+        query: { type: 'string', description: 'What information you need from the board. Include all relevant context (e.g. "list all sticky notes with their text and colors", "find objects near coordinates (200,300)", "count the frames and their titles").' },
+      },
+      required: ['query'],
     },
   },
   {

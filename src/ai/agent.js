@@ -8,7 +8,7 @@ import { buildSystemPrompt } from './systemPrompt.js';
 import { executeTool } from './executor.js';
 import { parseStream } from './streamParser.js';
 
-const MAX_TOOL_ROUNDS = 10;
+const MAX_TOOL_ROUNDS = 40;
 const MAX_RETRIES = 3;
 
 const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
@@ -33,6 +33,7 @@ const buildRequestBody = (messages, systemPrompt) => ({
 });
 
 const callProxyStream = async (messages, systemPrompt, onProgress, streamCallbacks, traceContext) => {
+  const fullContext = traceContext ? { ...traceContext, callType: 'conversation' } : { callType: 'conversation' };
   const body = JSON.stringify(buildRequestBody(messages, systemPrompt));
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
@@ -40,13 +41,13 @@ const callProxyStream = async (messages, systemPrompt, onProgress, streamCallbac
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(traceContext ? { 'X-Trace-Context': JSON.stringify(traceContext) } : {}),
+        'X-Trace-Context': JSON.stringify(fullContext),
       },
       body,
     });
 
     if ((response.status === 429 || response.status === 529) && attempt < MAX_RETRIES) {
-      const retryMs = parseRetryAfter(response) || (2 ** attempt) * 2000;
+      const retryMs = parseRetryAfter(response) || (2 ** attempt) * 60000;
       const waitSec = Math.ceil(retryMs / 1000);
       onProgress?.({ phase: 'rate_limited', waitSec });
       await sleep(retryMs);
@@ -64,6 +65,7 @@ const callProxyStream = async (messages, systemPrompt, onProgress, streamCallbac
 
 // Non-streaming fallback for tests and simple cases
 const callProxy = async (messages, systemPrompt, onProgress, traceContext) => {
+  const fullContext = traceContext ? { ...traceContext, callType: 'conversation' } : { callType: 'conversation' };
   const reqBody = buildRequestBody(messages, systemPrompt);
   delete reqBody.stream;
   delete reqBody.thinking;
@@ -75,13 +77,13 @@ const callProxy = async (messages, systemPrompt, onProgress, traceContext) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(traceContext ? { 'X-Trace-Context': JSON.stringify(traceContext) } : {}),
+        'X-Trace-Context': JSON.stringify(fullContext),
       },
       body,
     });
 
     if ((response.status === 429 || response.status === 529) && attempt < MAX_RETRIES) {
-      const retryMs = parseRetryAfter(response) || (2 ** attempt) * 2000;
+      const retryMs = parseRetryAfter(response) || (2 ** attempt) * 60000;
       const waitSec = Math.ceil(retryMs / 1000);
       onProgress?.({ phase: 'rate_limited', waitSec });
       await sleep(retryMs);
@@ -155,7 +157,7 @@ export const runAgent = async (userMessage, operations, onProgress, viewportCont
       onProgress?.({ phase: 'executing', tool: block.name, round });
       let result;
       try {
-        result = await executeTool(block.name, block.input, operations);
+        result = await executeTool(block.name, block.input, operations, traceContext);
       } catch (err) {
         console.error(`[AI Agent] Tool ${block.name} threw:`, err);
         result = { ok: false, error: err.message || 'Unknown tool error' };
