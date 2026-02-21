@@ -270,7 +270,7 @@ describe('AiChat', () => {
     it('shows progress text when loading with executing phase', () => {
       render(<AiChat onSubmit={vi.fn()} isLoading={true} progress={{ phase: 'executing', tool: 'createObject' }} />);
       fireEvent.click(screen.getByTestId('ai-chat-toggle'));
-      expect(screen.getByText('Running createObject…')).toBeInTheDocument();
+      expect(screen.getByText('Creating…')).toBeInTheDocument();
     });
 
     it('shows rate limit text when rate limited', () => {

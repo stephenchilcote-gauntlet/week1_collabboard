@@ -121,12 +121,20 @@ export default function AiChat({ onSubmit, isLoading, progress, onNewConversatio
     }
   };
 
+  const TOOL_FRIENDLY_NAMES = {
+    createObject: 'Creating',
+    updateObject: 'Updating',
+    deleteObject: 'Deleting',
+    getBoardState: 'Reading board',
+    fitFrameToObjects: 'Fitting frame',
+    layoutObjects: 'Laying out objects',
+  };
   const progressText = progress
     ? progress.phase === 'calling'
       ? 'Thinking…'
       : progress.phase === 'rate_limited'
         ? `Rate limited — retrying in ${progress.waitSec}s…`
-        : `Running ${progress.tool}…`
+        : `${TOOL_FRIENDLY_NAMES[progress.tool] || progress.tool}…`
     : '';
 
   const hasInput = input.trim().length > 0;
