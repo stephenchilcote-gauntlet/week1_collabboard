@@ -10,7 +10,7 @@ import {
 } from '../utils/colors.js';
 import { getObjectBounds, intersectsRect, containsRect } from '../utils/coordinates.js';
 import { uuidToLabel } from './labels.js';
-import { AI_PROXY_URL } from './config.js';
+import { AI_PROXY_URL, getAuthToken } from './config.js';
 import { parseStream } from './streamParser.js';
 
 const TYPE_DEFAULTS = {
@@ -255,11 +255,13 @@ const extractBoardInfo = async (query, boardData, traceContext, onStream) => {
     reqBody.stream = true;
     reqBody.thinking = { type: 'enabled', budget_tokens: 5000 };
   }
+  const token = await getAuthToken();
   const response = await fetch(AI_PROXY_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Trace-Context': JSON.stringify(fullContext),
+      ...(token && { Authorization: `Bearer ${token}` }),
     },
     body: JSON.stringify(reqBody),
   });

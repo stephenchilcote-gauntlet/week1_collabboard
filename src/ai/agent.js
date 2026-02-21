@@ -2,7 +2,7 @@
 // handles tool-use loops, and executes tool calls against the board.
 // Supports streaming responses with extended thinking.
 
-import { AI_PROXY_URL } from './config.js';
+import { AI_PROXY_URL, getAuthToken } from './config.js';
 import { TOOLS } from './tools.js';
 import { buildSystemPrompt } from './systemPrompt.js';
 import { executeTool } from './executor.js';
@@ -35,6 +35,7 @@ const buildRequestBody = (messages, systemPrompt) => ({
 const callProxyStream = async (messages, systemPrompt, onProgress, streamCallbacks, traceContext) => {
   const fullContext = traceContext ? { ...traceContext, callType: 'conversation' } : { callType: 'conversation' };
   const body = JSON.stringify(buildRequestBody(messages, systemPrompt));
+  const token = await getAuthToken();
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
     const response = await fetch(AI_PROXY_URL, {
@@ -42,6 +43,7 @@ const callProxyStream = async (messages, systemPrompt, onProgress, streamCallbac
       headers: {
         'Content-Type': 'application/json',
         'X-Trace-Context': JSON.stringify(fullContext),
+        ...(token && { Authorization: `Bearer ${token}` }),
       },
       body,
     });
@@ -71,6 +73,7 @@ const callProxy = async (messages, systemPrompt, onProgress, traceContext) => {
   delete reqBody.thinking;
   reqBody.max_tokens = 4096;
   const body = JSON.stringify(reqBody);
+  const token = await getAuthToken();
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
     const response = await fetch(AI_PROXY_URL, {
@@ -78,6 +81,7 @@ const callProxy = async (messages, systemPrompt, onProgress, traceContext) => {
       headers: {
         'Content-Type': 'application/json',
         'X-Trace-Context': JSON.stringify(fullContext),
+        ...(token && { Authorization: `Bearer ${token}` }),
       },
       body,
     });

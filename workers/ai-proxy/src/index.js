@@ -2,11 +2,36 @@
 // Forwards requests to Anthropic API without exposing the key to the client.
 
 import { Langfuse } from 'langfuse';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-Trace-Context',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Trace-Context, Authorization',
+};
+
+const GOOGLE_JWKS = createRemoteJWKSet(
+  new URL('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com'),
+);
+
+const verifyFirebaseToken = async (request, projectId) => {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { error: 'Missing or malformed Authorization header', status: 401 };
+  }
+  const token = authHeader.slice(7);
+  try {
+    const { payload } = await jwtVerify(token, GOOGLE_JWKS, {
+      issuer: `https://securetoken.google.com/${projectId}`,
+      audience: projectId,
+    });
+    if (!payload.sub) {
+      return { error: 'Token missing subject', status: 401 };
+    }
+    return { uid: payload.sub };
+  } catch {
+    return { error: 'Invalid or expired token', status: 401 };
+  }
 };
 
 export default {
@@ -20,6 +45,16 @@ export default {
         status: 405,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       });
+    }
+
+    if (env.FIREBASE_PROJECT_ID) {
+      const authResult = await verifyFirebaseToken(request, env.FIREBASE_PROJECT_ID);
+      if (authResult.error) {
+        return new Response(JSON.stringify({ error: authResult.error }), {
+          status: authResult.status,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     const apiKey = env.ANTHROPIC_API_KEY;
