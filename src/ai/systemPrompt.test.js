@@ -5,8 +5,8 @@ describe('buildSystemPrompt', () => {
   it('returns base prompt when context is null', () => {
     const prompt = buildSystemPrompt(null);
     expect(prompt).toContain('CollabBoard');
-    expect(prompt).toContain('layoutObjects');
-    expect(prompt).toContain('filter');
+    expect(prompt).toContain('applyTemplate');
+    expect(prompt).toContain('DSL');
     expect(prompt).not.toContain('Viewport');
   });
 

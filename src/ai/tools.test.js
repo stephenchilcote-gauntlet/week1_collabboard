@@ -7,8 +7,8 @@ describe('TOOLS', () => {
     expect(TOOLS.length).toBeGreaterThan(0);
   });
 
-  it('has exactly 6 consolidated tools', () => {
-    expect(TOOL_NAMES).toEqual(['createObject', 'updateObject', 'deleteObject', 'getBoardState', 'fitFrameToObjects', 'layoutObjects']);
+  it('has exactly 3 consolidated tools', () => {
+    expect(TOOL_NAMES).toEqual(['applyTemplate', 'searchTemplates', 'getBoardState']);
   });
 
   it('every tool has name, description, and input_schema', () => {
@@ -24,16 +24,17 @@ describe('TOOLS', () => {
     expect(new Set(TOOL_NAMES).size).toBe(TOOL_NAMES.length);
   });
 
-  it('createObject supports all board object types', () => {
-    const createTool = TOOLS.find((t) => t.name === 'createObject');
-    const typeEnum = createTool.input_schema.properties.type.enum;
-    expect(typeEnum).toContain('sticky');
-    expect(typeEnum).toContain('rectangle');
-    expect(typeEnum).toContain('circle');
-    expect(typeEnum).toContain('text');
-    expect(typeEnum).toContain('frame');
-    expect(typeEnum).toContain('connector');
-    expect(typeEnum).toContain('embed');
+  it('applyTemplate accepts dsl or xml', () => {
+    const tool = TOOLS.find((t) => t.name === 'applyTemplate');
+    expect(tool.input_schema.properties).toHaveProperty('dsl');
+    expect(tool.input_schema.properties).toHaveProperty('xml');
+    expect(tool.input_schema.properties).toHaveProperty('x');
+    expect(tool.input_schema.properties).toHaveProperty('y');
+  });
+
+  it('searchTemplates requires query', () => {
+    const tool = TOOLS.find((t) => t.name === 'searchTemplates');
+    expect(tool.input_schema.required).toContain('query');
   });
 
   it('every required field is listed in the schema', () => {

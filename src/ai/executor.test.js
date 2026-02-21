@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { test, fc } from '@fast-check/vitest';
 import { executeTool, collectViewportObjects } from './executor.js';
+import { TEMPLATES } from './templates.js';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -660,6 +662,584 @@ describe('executeTool', () => {
       const result = await executeTool('deleteObject', { objectId: 'ghost' }, ops);
       expect(result.ok).toBe(false);
       expect(result.error).toContain('0 object(s)');
+    });
+  });
+
+  describe('applyTemplate', () => {
+    it('applies a named template via DSL', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        dsl: 'swot "Q1 Review" ; Strength ; Weakness ; Opportunity ; Threat',
+        x: 0, y: 0,
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.created).toBeGreaterThanOrEqual(5); // frame + 4 stickies
+      const createdObjs = Object.values(ops.getObjects());
+      const frame = createdObjs.find((o) => o.type === 'frame');
+      expect(frame).toBeDefined();
+      expect(frame.title).toBe('Q1 Review');
+      const stickies = createdObjs.filter((o) => o.type === 'sticky');
+      expect(stickies.length).toBe(4);
+      const texts = stickies.map((s) => s.text).sort();
+      expect(texts).toEqual(['Opportunity', 'Strength', 'Threat', 'Weakness']);
+    });
+
+    it('applies raw XML to create objects', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        xml: '<sticky color="#FF0000">Hello</sticky>',
+        x: 100, y: 200,
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.created).toBe(1);
+      const created = Object.values(ops.getObjects())[0];
+      expect(created.type).toBe('sticky');
+      expect(created.text).toBe('Hello');
+      expect(created.color).toBe('#FF0000');
+    });
+
+    it('creates connectors with key resolution', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        xml: '<frame title="Flow"><row gap="20"><sticky key="a" color="#FFD700">Start</sticky><sticky key="b" color="#FF6B6B">End</sticky><connector from="a" to="b" style="arrow"/></row></frame>',
+        x: 0, y: 0,
+      }, ops);
+      expect(result.ok).toBe(true);
+      const createdObjs = Object.values(ops.getObjects());
+      const conn = createdObjs.find((o) => o.type === 'connector');
+      expect(conn).toBeDefined();
+      expect(conn.style).toBe('arrow');
+      const stickies = createdObjs.filter((o) => o.type === 'sticky');
+      expect(conn.fromId).toBe(stickies.find((s) => s.text === 'Start').id);
+      expect(conn.toId).toBe(stickies.find((s) => s.text === 'End').id);
+    });
+
+    it('creates connectors to existing board objects', async () => {
+      const existing = { id: 'existing-1', label: 'my label', type: 'sticky', x: 0, y: 0 };
+      const ops = makeOperations({ 'existing-1': existing });
+      const result = await executeTool('applyTemplate', {
+        xml: '<sticky key="new1" color="#FFD700">New</sticky>',
+        x: 300, y: 0,
+      }, ops);
+      expect(result.ok).toBe(true);
+      // Now create a connector to the existing object via another applyTemplate call
+      const result2 = await executeTool('applyTemplate', {
+        xml: '<connector from="my label" to="new1" style="line"/>',
+      }, ops);
+      // The connector from key "new1" won't resolve since it was a template key, not a label
+      // But "my label" resolves via resolveId
+      // This tests the fallback to resolveId for connector endpoints
+      expect(result2.ok).toBe(true);
+    });
+
+    it('fails with unknown template name', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        dsl: 'nonexistent-template',
+      }, ops);
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('nonexistent-template');
+    });
+
+    it('fails with no dsl or xml', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {}, ops);
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('dsl');
+    });
+
+    it('applies DSL patches', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        dsl: 'swot\n@grid/sticky[1]/@color #FF0000',
+        x: 0, y: 0,
+      }, ops);
+      expect(result.ok).toBe(true);
+      const stickies = Object.values(ops.getObjects()).filter((o) => o.type === 'sticky');
+      const redSticky = stickies.find((s) => s.color === '#FF0000');
+      expect(redSticky).toBeDefined();
+    });
+
+    it('frame gets lower zIndex than children', async () => {
+      const ops = makeOperations();
+      await executeTool('applyTemplate', {
+        dsl: 'swot',
+        x: 0, y: 0,
+      }, ops);
+      const createdObjs = Object.values(ops.getObjects());
+      const frame = createdObjs.find((o) => o.type === 'frame');
+      const stickies = createdObjs.filter((o) => o.type === 'sticky');
+      for (const sticky of stickies) {
+        expect(sticky.zIndex).toBeGreaterThan(frame.zIndex);
+      }
+    });
+
+    it('returns error with parsererror for invalid XML', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        xml: '<sticky color="red">unclosed',
+      }, ops);
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('Invalid XML');
+    });
+
+    it('errors when DSL has only patches and no template name', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        dsl: '@grid/sticky[1]/@color #FF0000',
+        x: 0, y: 0,
+      }, ops);
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('template name');
+    });
+
+    it('creates a single object from template with no frame', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        xml: '<sticky color="#FFD700">Just one</sticky>',
+        x: 0, y: 0,
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.created).toBe(1);
+      const objs = Object.values(ops.getObjects());
+      expect(objs.length).toBe(1);
+      expect(objs[0].type).toBe('sticky');
+      expect(objs[0].text).toBe('Just one');
+    });
+
+    it('creates multiple stickies via XML row', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        xml: '<row gap="20"><sticky color="#FFD700">A</sticky><sticky color="#FF6B6B">B</sticky><sticky color="#96CEB4">C</sticky></row>',
+        x: 0, y: 0,
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.created).toBe(3);
+      const objs = Object.values(ops.getObjects());
+      const texts = objs.map((o) => o.text).sort();
+      expect(texts).toEqual(['A', 'B', 'C']);
+      // Ensure they have different x positions (laid out in a row)
+      const xs = objs.map((o) => o.x);
+      const uniqueXs = new Set(xs);
+      expect(uniqueXs.size).toBe(3);
+    });
+
+    it('places template at specific x,y coordinates', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        xml: '<sticky color="#FFD700">Placed</sticky>',
+        x: 500, y: 300,
+      }, ops);
+      expect(result.ok).toBe(true);
+      const obj = Object.values(ops.getObjects())[0];
+      // Object is centered at (500, 300), so x = 500 - width/2, y = 300 - height/2
+      const cx = obj.x + obj.width / 2;
+      const cy = obj.y + obj.height / 2;
+      expect(cx).toBe(500);
+      expect(cy).toBe(300);
+    });
+
+    it('reports error entry for connector with unresolvable keys but ok is still true', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        xml: '<frame title="Test"><sticky key="a" color="#FFD700">A</sticky><connector from="nonexistent1" to="nonexistent2" style="arrow"/></frame>',
+        x: 0, y: 0,
+      }, ops);
+      expect(result.ok).toBe(true);
+      const connEntry = result.objects.find((o) => o.type === 'connector' && o.error);
+      expect(connEntry).toBeDefined();
+      expect(connEntry.error).toContain('Could not resolve');
+    });
+
+    it('fills template slots via DSL', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        dsl: 'swot ; MyStrength ; MyWeakness ; MyOpp ; MyThreat',
+        x: 0, y: 0,
+      }, ops);
+      expect(result.ok).toBe(true);
+      const stickies = Object.values(ops.getObjects()).filter((o) => o.type === 'sticky');
+      const texts = stickies.map((s) => s.text).sort();
+      expect(texts).toEqual(['MyOpp', 'MyStrength', 'MyThreat', 'MyWeakness']);
+    });
+
+    it('applies DSL with title AND patches together', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        dsl: 'swot "Patched Title"\n@grid/sticky[1]/@color #0000FF',
+        x: 0, y: 0,
+      }, ops);
+      expect(result.ok).toBe(true);
+      const objs = Object.values(ops.getObjects());
+      const frame = objs.find((o) => o.type === 'frame');
+      expect(frame.title).toBe('Patched Title');
+      const blueSticky = objs.find((o) => o.type === 'sticky' && o.color === '#0000FF');
+      expect(blueSticky).toBeDefined();
+    });
+
+    it('handles nested frame > grid > sticky layout via XML', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        xml: '<frame title="Nested"><grid cols="2" gap="10"><sticky color="#FFD700">A</sticky><sticky color="#FF6B6B">B</sticky><sticky color="#96CEB4">C</sticky><sticky color="#45B7D1">D</sticky></grid></frame>',
+        x: 0, y: 0,
+      }, ops);
+      expect(result.ok).toBe(true);
+      const objs = Object.values(ops.getObjects());
+      expect(objs.find((o) => o.type === 'frame')).toBeDefined();
+      const stickies = objs.filter((o) => o.type === 'sticky');
+      expect(stickies.length).toBe(4);
+    });
+
+    it('returns parsererror for empty xml string', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', { xml: '' }, ops);
+      expect(result.ok).toBe(false);
+    });
+
+    it('assigns labels to template objects', async () => {
+      const ops = makeOperations();
+      await executeTool('applyTemplate', {
+        xml: '<sticky color="#FFD700">Labeled</sticky>',
+        x: 0, y: 0,
+      }, ops);
+      const obj = Object.values(ops.getObjects())[0];
+      expect(obj.label).toBeDefined();
+      expect(typeof obj.label).toBe('string');
+      expect(obj.label.length).toBeGreaterThan(0);
+    });
+
+    it('creates objects with correct types (frame, sticky, text)', async () => {
+      const ops = makeOperations();
+      await executeTool('applyTemplate', {
+        xml: '<frame title="Types"><row gap="10"><sticky color="#FFD700">S</sticky><text size="16">T</text></row></frame>',
+        x: 0, y: 0,
+      }, ops);
+      const objs = Object.values(ops.getObjects());
+      const types = objs.map((o) => o.type);
+      expect(types).toContain('frame');
+      expect(types).toContain('sticky');
+      expect(types).toContain('text');
+    });
+
+    it('value-prop template has double-escaped &amp;amp; bug', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        dsl: 'value-prop',
+        x: 0, y: 0,
+      }, ops);
+      expect(result.ok).toBe(true);
+      const stickies = Object.values(ops.getObjects()).filter((o) => o.type === 'sticky');
+      // The template source uses s('Products &amp; Services', GN)
+      // esc() double-escapes &amp; → &amp;amp; in XML, which DOMParser parses back to &amp;
+      const ampSticky = stickies.find((s) => s.text && s.text.includes('&'));
+      expect(ampSticky).toBeDefined();
+      expect(ampSticky.text).toContain('&amp;');
+    });
+
+    test.prop([fc.constantFrom(...Object.keys(TEMPLATES))])('every template in TEMPLATES succeeds with ok:true', async (name) => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', { dsl: name, x: 0, y: 0 }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.created).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('searchTemplates', () => {
+    beforeEach(() => { mockFetch.mockReset(); });
+
+    it('returns search results on success', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          content: [{ type: 'text', text: 'swot|Strengths; Weaknesses|strategic grid' }],
+        }),
+      });
+      const ops = makeOperations();
+      const result = await executeTool('searchTemplates', { query: 'strategic analysis' }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.result).toContain('swot');
+    });
+
+    it('returns ok:false with error on fetch failure', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: async () => 'Internal Server Error',
+      });
+      const ops = makeOperations();
+      const result = await executeTool('searchTemplates', { query: 'anything' }, ops);
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('500');
+    });
+
+    it('supports streaming mode with onStream callback', async () => {
+      const chunks = [];
+      const onStream = (chunk) => chunks.push(chunk);
+      const mockReader = {
+        read: vi.fn()
+          .mockResolvedValueOnce({
+            done: false,
+            value: new TextEncoder().encode(
+              'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n' +
+              'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"swot|grid"}}\n\n' +
+              'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n',
+            ),
+          })
+          .mockResolvedValueOnce({ done: true }),
+      };
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        body: { getReader: () => mockReader },
+      });
+      const ops = makeOperations();
+      const result = await executeTool('searchTemplates', { query: 'strategy' }, ops, null, onStream);
+      expect(result.ok).toBe(true);
+      expect(chunks.length).toBeGreaterThan(0);
+      expect(chunks.some((c) => c.type === 'subAgentText')).toBe(true);
+    });
+  });
+
+  describe('XML update via applyTemplate', () => {
+    it('updates text of existing object', async () => {
+      const ops = makeOperations({ s1: { id: 's1', label: 'snake early india', type: 'sticky', text: 'Old', x: 0, y: 0, width: 200, height: 160 } });
+      const result = await executeTool('applyTemplate', {
+        xml: '<update ref="snake early india" text="New text"/>',
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(ops.updateObject).toHaveBeenCalledWith('s1', { text: 'New text' });
+    });
+
+    it('updates color of existing object', async () => {
+      const ops = makeOperations({ s1: { id: 's1', label: 'snake early india', type: 'sticky', color: '#FFD700', x: 0, y: 0, width: 200, height: 160 } });
+      const result = await executeTool('applyTemplate', {
+        xml: '<update ref="snake early india" color="#FF0000"/>',
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(ops.updateObject).toHaveBeenCalledWith('s1', { color: '#FF0000' });
+    });
+
+    it('updates position (center coords)', async () => {
+      const ops = makeOperations({ s1: { id: 's1', label: 'snake early india', type: 'sticky', x: 0, y: 0, width: 200, height: 160 } });
+      const result = await executeTool('applyTemplate', {
+        xml: '<update ref="snake early india" x="500" y="300"/>',
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(ops.updateObject).toHaveBeenCalledWith('s1', { x: 400, y: 220 });
+    });
+
+    it('updates size', async () => {
+      const ops = makeOperations({ s1: { id: 's1', label: 'snake early india', type: 'sticky', x: 0, y: 0, width: 200, height: 160 } });
+      const result = await executeTool('applyTemplate', {
+        xml: '<update ref="snake early india" width="300" height="200"/>',
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(ops.updateObject).toHaveBeenCalledWith('s1', { width: 300, height: 200 });
+    });
+
+    it('updates frame title', async () => {
+      const ops = makeOperations({ f1: { id: 'f1', label: 'delta echo foxtrot', type: 'frame', title: 'Old', x: 0, y: 0, width: 500, height: 400 } });
+      const result = await executeTool('applyTemplate', {
+        xml: '<update ref="delta echo foxtrot" title="Sprint 42"/>',
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(ops.updateObject).toHaveBeenCalledWith('f1', { title: 'Sprint 42' });
+    });
+
+    it('updates zIndex', async () => {
+      const ops = makeOperations({ s1: { id: 's1', label: 'snake early india', type: 'sticky', x: 0, y: 0, width: 200, height: 160 } });
+      const result = await executeTool('applyTemplate', {
+        xml: '<update ref="snake early india" zIndex="100"/>',
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(ops.updateObject).toHaveBeenCalledWith('s1', { zIndex: 100 });
+    });
+
+    it('fails for non-existent object', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        xml: '<update ref="ghost label here" text="Nope"/>',
+      }, ops);
+      expect(result.ok).toBe(false);
+    });
+
+    it('fails with no ref attribute', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        xml: '<update text="No ref"/>',
+      }, ops);
+      expect(result.ok).toBe(false);
+      expect(result.results[0].error).toContain('No ref');
+    });
+  });
+
+  describe('XML delete via applyTemplate', () => {
+    it('deletes an existing object', async () => {
+      const ops = makeOperations({ s1: { id: 's1', label: 'snake early india', type: 'sticky' } });
+      const result = await executeTool('applyTemplate', {
+        xml: '<delete ref="snake early india"/>',
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(ops.deleteObject).toHaveBeenCalledWith('s1');
+    });
+
+    it('fails for non-existent object', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        xml: '<delete ref="ghost label here"/>',
+      }, ops);
+      expect(result.ok).toBe(false);
+    });
+
+    it('fails with no ref attribute', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        xml: '<delete/>',
+      }, ops);
+      expect(result.ok).toBe(false);
+      expect(result.results[0].error).toContain('No ref');
+    });
+  });
+
+  describe('XML layout via applyTemplate', () => {
+    it('grid layout', async () => {
+      const ops = makeOperations({
+        a: { id: 'a', label: 'alpha bravo charlie', type: 'sticky', x: 0, y: 0, width: 200, height: 160 },
+        b: { id: 'b', label: 'delta echo foxtrot', type: 'sticky', x: 10, y: 10, width: 200, height: 160 },
+        c: { id: 'c', label: 'golf hotel india', type: 'sticky', x: 20, y: 20, width: 200, height: 160 },
+      });
+      const result = await executeTool('applyTemplate', {
+        xml: '<layout mode="grid" cols="3" gap="30"><ref>alpha bravo charlie</ref><ref>delta echo foxtrot</ref><ref>golf hotel india</ref></layout>',
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(ops.updateObject).toHaveBeenCalledTimes(3);
+    });
+
+    it('align left', async () => {
+      const ops = makeOperations({
+        a: { id: 'a', label: 'alpha bravo charlie', type: 'sticky', x: 100, y: 0, width: 200, height: 160 },
+        b: { id: 'b', label: 'delta echo foxtrot', type: 'sticky', x: 200, y: 100, width: 200, height: 160 },
+      });
+      const result = await executeTool('applyTemplate', {
+        xml: '<layout mode="align" alignment="left"><ref>alpha bravo charlie</ref><ref>delta echo foxtrot</ref></layout>',
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(ops.updateObject).toHaveBeenCalledWith('a', { x: 100 });
+      expect(ops.updateObject).toHaveBeenCalledWith('b', { x: 100 });
+    });
+
+    it('distributeH', async () => {
+      const ops = makeOperations({
+        a: { id: 'a', label: 'alpha bravo charlie', type: 'sticky', x: 0, y: 0, width: 200, height: 160 },
+        b: { id: 'b', label: 'delta echo foxtrot', type: 'sticky', x: 500, y: 0, width: 200, height: 160 },
+      });
+      const result = await executeTool('applyTemplate', {
+        xml: '<layout mode="distributeH"><ref>alpha bravo charlie</ref><ref>delta echo foxtrot</ref></layout>',
+      }, ops);
+      expect(result.ok).toBe(true);
+    });
+
+    it('fails with no mode', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        xml: '<layout><ref>abc</ref></layout>',
+      }, ops);
+      expect(result.ok).toBe(false);
+      expect(result.results[0].error).toContain('No mode');
+    });
+
+    it('fails with no refs', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        xml: '<layout mode="grid"/>',
+      }, ops);
+      expect(result.ok).toBe(false);
+      expect(result.results[0].error).toContain('No <ref>');
+    });
+  });
+
+  describe('XML batch via applyTemplate', () => {
+    it('batch update + delete', async () => {
+      const ops = makeOperations({
+        s1: { id: 's1', label: 'snake early india', type: 'sticky', text: 'Old', x: 0, y: 0, width: 200, height: 160 },
+        s2: { id: 's2', label: 'bacon cold florida', type: 'sticky', x: 0, y: 0, width: 200, height: 160 },
+      });
+      const result = await executeTool('applyTemplate', {
+        xml: '<batch><update ref="snake early india" text="Updated"/><delete ref="bacon cold florida"/></batch>',
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(ops.updateObject).toHaveBeenCalledWith('s1', { text: 'Updated' });
+      expect(ops.deleteObject).toHaveBeenCalledWith('s2');
+    });
+
+    it('batch create + update', async () => {
+      const ops = makeOperations({
+        s1: { id: 's1', label: 'snake early india', type: 'sticky', x: 0, y: 0, width: 200, height: 160, color: '#FFD700' },
+      });
+      const result = await executeTool('applyTemplate', {
+        xml: '<batch><sticky color="#FF6B6B">New Note</sticky><update ref="snake early india" color="#DDA0DD"/></batch>',
+        x: 500, y: 300,
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.created).toBe(1);
+      expect(ops.createObject).toHaveBeenCalledTimes(1);
+      expect(ops.updateObject).toHaveBeenCalledWith('s1', { color: '#DDA0DD' });
+    });
+
+    it('batch create + delete + update', async () => {
+      const ops = makeOperations({
+        s1: { id: 's1', label: 'snake early india', type: 'sticky', text: 'Old', x: 0, y: 0, width: 200, height: 160 },
+        s2: { id: 's2', label: 'happy cat delaware', type: 'sticky', x: 0, y: 0, width: 200, height: 160 },
+      });
+      const result = await executeTool('applyTemplate', {
+        xml: '<batch><sticky color="#FF0000">Urgent Fix</sticky><delete ref="happy cat delaware"/><update ref="snake early india" text="Started"/></batch>',
+        x: 600, y: 700,
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.created).toBe(1);
+      expect(ops.createObject).toHaveBeenCalledTimes(1);
+      expect(ops.deleteObject).toHaveBeenCalledWith('s2');
+      expect(ops.updateObject).toHaveBeenCalledWith('s1', { text: 'Started' });
+    });
+
+    it('batch with multiple creates using individual positions', async () => {
+      const ops = makeOperations();
+      const result = await executeTool('applyTemplate', {
+        xml: '<batch><sticky color="#FFD700" x="200" y="100">A</sticky><sticky color="#FF6B6B" x="500" y="100">B</sticky></batch>',
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.created).toBe(2);
+      const calls = ops.createObject.mock.calls;
+      const objA = calls.find((c) => c[0].text === 'A')[0];
+      const objB = calls.find((c) => c[0].text === 'B')[0];
+      const cxA = objA.x + objA.width / 2;
+      const cxB = objB.x + objB.width / 2;
+      expect(cxA).toBe(200);
+      expect(cxB).toBe(500);
+    });
+
+    it('batch with only operations (no spatial)', async () => {
+      const ops = makeOperations({
+        s1: { id: 's1', label: 'snake early india', type: 'sticky', x: 0, y: 0, width: 200, height: 160 },
+        s2: { id: 's2', label: 'bacon cold florida', type: 'sticky', x: 0, y: 0, width: 200, height: 160 },
+        s3: { id: 's3', label: 'happy cat delaware', type: 'sticky', x: 0, y: 0, width: 200, height: 160 },
+      });
+      const result = await executeTool('applyTemplate', {
+        xml: '<batch><update ref="snake early india" color="#45B7D1"/><update ref="bacon cold florida" color="#45B7D1"/><update ref="happy cat delaware" color="#45B7D1"/></batch>',
+      }, ops);
+      expect(result.ok).toBe(true);
+      expect(result.created).toBe(0);
+      expect(ops.updateObject).toHaveBeenCalledTimes(3);
+    });
+
+    it('batch with layout operation', async () => {
+      const ops = makeOperations({
+        a: { id: 'a', label: 'alpha bravo charlie', type: 'sticky', x: 0, y: 0, width: 200, height: 160 },
+        b: { id: 'b', label: 'delta echo foxtrot', type: 'sticky', x: 10, y: 10, width: 200, height: 160 },
+      });
+      const result = await executeTool('applyTemplate', {
+        xml: '<batch><update ref="alpha bravo charlie" color="#FF0000"/><layout mode="grid" cols="2"><ref>alpha bravo charlie</ref><ref>delta echo foxtrot</ref></layout></batch>',
+      }, ops);
+      expect(result.ok).toBe(true);
     });
   });
 

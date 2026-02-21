@@ -12,6 +12,11 @@ import { getObjectBounds, intersectsRect, containsRect } from '../utils/coordina
 import { uuidToLabel } from './labels.js';
 import { AI_PROXY_URL, getAuthToken } from './config.js';
 import { parseStream } from './streamParser.js';
+import { TEMPLATES } from './templates.js';
+import { parseDsl } from './dslParser.js';
+import { applyPatches } from './xpathPatcher.js';
+import { fillSlots, layoutTemplate } from './layoutEngine.js';
+import { searchTemplates } from './templateSearch.js';
 
 const TYPE_DEFAULTS = {
   sticky: { width: 200, height: 160, color: DEFAULT_STICKY_COLOR },
@@ -480,11 +485,245 @@ const handleLayoutObjects = async (input, operations) => {
   return { ok: false, error: `Unknown layout mode "${mode}". Use "grid", "distributeH", "distributeV", or "align".` };
 };
 
+const OPERATION_TAGS = new Set(['update', 'delete', 'layout']);
+
+// Extract operation elements (update, delete, layout) from a parsed DOM,
+// removing them from the tree. Returns { ops, hasSpatial, spatialRoots? }.
+const extractXmlOps = (doc) => {
+  const ops = [];
+  const root = doc.documentElement;
+
+  // Root is a single operation element
+  if (OPERATION_TAGS.has(root.tagName)) {
+    return { ops: [root], hasSpatial: false };
+  }
+
+  // Root is not a batch — no operations to extract
+  if (root.tagName !== 'batch') {
+    return { ops: [], hasSpatial: true };
+  }
+
+  // Root is <batch> — separate children into operations and spatial
+  const toRemove = [];
+  const spatialRoots = [];
+  for (const child of Array.from(root.childNodes)) {
+    if (child.nodeType !== 1) continue;
+    if (OPERATION_TAGS.has(child.tagName)) {
+      ops.push(child);
+      toRemove.push(child);
+    } else {
+      spatialRoots.push(child);
+    }
+  }
+  for (const node of toRemove) root.removeChild(node);
+
+  return { ops, hasSpatial: spatialRoots.length > 0, spatialRoots };
+};
+
+// Execute a single <update> element against the board.
+const executeXmlUpdate = async (el, boardOps) => {
+  const ref = el.getAttribute('ref');
+  if (!ref) return { type: 'update', ok: false, error: 'No ref attribute on <update>.' };
+  const input = { objectId: ref };
+  for (const attr of el.attributes) {
+    if (attr.name === 'ref') continue;
+    if (['x', 'y', 'width', 'height', 'zIndex'].includes(attr.name)) {
+      input[attr.name] = Number(attr.value);
+    } else {
+      input[attr.name] = attr.value;
+    }
+  }
+  const textContent = el.textContent?.trim();
+  if (textContent && input.text == null) input.text = textContent;
+  const result = await handleUpdateSingle(input, boardOps);
+  return { type: 'update', ...result };
+};
+
+// Execute a single <delete> element.
+const executeXmlDelete = async (el, boardOps) => {
+  const ref = el.getAttribute('ref');
+  if (!ref) return { type: 'delete', ok: false, error: 'No ref attribute on <delete>.' };
+  const result = await handleDelete({ objectId: ref }, boardOps);
+  return { type: 'delete', ...result };
+};
+
+// Execute a single <layout> element.
+const executeXmlLayout = async (el, boardOps) => {
+  const mode = el.getAttribute('mode');
+  if (!mode) return { type: 'layout', ok: false, error: 'No mode attribute on <layout>.' };
+  const objectIds = Array.from(el.getElementsByTagName('ref')).map((r) => r.textContent.trim());
+  if (objectIds.length === 0) return { type: 'layout', ok: false, error: 'No <ref> children in <layout>.' };
+  const input = { mode, objectIds };
+  if (el.hasAttribute('cols')) input.columns = Number(el.getAttribute('cols'));
+  if (el.hasAttribute('columns')) input.columns = Number(el.getAttribute('columns'));
+  if (el.hasAttribute('gap')) input.spacing = Number(el.getAttribute('gap'));
+  if (el.hasAttribute('spacing')) input.spacing = Number(el.getAttribute('spacing'));
+  if (el.hasAttribute('alignment')) input.alignment = el.getAttribute('alignment');
+  if (el.hasAttribute('startX')) input.startX = Number(el.getAttribute('startX'));
+  if (el.hasAttribute('startY')) input.startY = Number(el.getAttribute('startY'));
+  const result = await handleLayoutObjects(input, boardOps);
+  return { type: 'layout', ...result };
+};
+
+// Execute extracted operation elements against the board.
+const executeXmlOps = async (xmlOps, boardOps) => {
+  const results = [];
+  for (const el of xmlOps) {
+    if (el.tagName === 'update') results.push(await executeXmlUpdate(el, boardOps));
+    else if (el.tagName === 'delete') results.push(await executeXmlDelete(el, boardOps));
+    else if (el.tagName === 'layout') results.push(await executeXmlLayout(el, boardOps));
+  }
+  return results;
+};
+
+// Create board objects from layout specs. Shared by template and batch creation paths.
+const createFromSpecs = async (specs, operations, keyMap) => {
+  const objects = operations.getObjects();
+  const baseZ = maxZIndex(objects);
+  const created = [];
+  let zCounter = 1;
+
+  const spatial = specs.filter((sp) => sp.type !== 'connector');
+  const connectors = specs.filter((sp) => sp.type === 'connector');
+
+  for (const spec of spatial) {
+    const id = generateId();
+    const label = uuidToLabel(id);
+    const isFrame = spec.type === 'frame';
+    const zIndex = isFrame ? (baseZ - 1) : (baseZ + zCounter++);
+    const obj = {
+      id,
+      label,
+      type: spec.type,
+      x: spec.x - spec.width / 2,
+      y: spec.y - spec.height / 2,
+      width: spec.width,
+      height: spec.height,
+      zIndex,
+    };
+    if (spec.text != null && spec.text !== '') obj.text = spec.text;
+    if (spec.color != null) obj.color = spec.color;
+    if (spec.title != null) obj.title = spec.title;
+    if (spec.fontSize != null) obj.fontSize = spec.fontSize;
+    if (spec.html != null) obj.html = spec.html;
+    await operations.createObject(obj);
+    if (spec.key) keyMap[spec.key] = id;
+    created.push({ label, type: spec.type });
+  }
+
+  for (const spec of connectors) {
+    let fromId = keyMap[spec.fromKey];
+    let toId = keyMap[spec.toKey];
+    if (!fromId) {
+      const res = resolveId(spec.fromKey, operations.getObjects());
+      if (res.ok) fromId = res.id;
+    }
+    if (!toId) {
+      const res = resolveId(spec.toKey, operations.getObjects());
+      if (res.ok) toId = res.id;
+    }
+    if (!fromId || !toId) {
+      created.push({ type: 'connector', error: `Could not resolve: ${spec.fromKey} → ${spec.toKey}` });
+      continue;
+    }
+    const id = generateId();
+    const label = uuidToLabel(id);
+    const fromZ = operations.getObjects()[fromId]?.zIndex ?? 0;
+    const toZ = operations.getObjects()[toId]?.zIndex ?? 0;
+    await operations.createObject({
+      id, label, type: 'connector', fromId, toId,
+      style: spec.style || 'line',
+      color: spec.color || '#111827',
+      strokeWidth: 2,
+      zIndex: Math.min(fromZ, toZ) - 1,
+    });
+    created.push({ label, type: 'connector' });
+  }
+
+  return created;
+};
+
+const handleApplyTemplate = async (input, operations) => {
+  let doc;
+  if (input.dsl) {
+    const ops = parseDsl(input.dsl);
+    const applyOp = ops.find((o) => o.type === 'apply');
+    if (!applyOp) return { ok: false, error: 'DSL must contain a template name.' };
+    const templateXml = TEMPLATES[applyOp.name];
+    if (!templateXml) return { ok: false, error: `Unknown template "${applyOp.name}". Use searchTemplates to find available templates.` };
+    doc = new DOMParser().parseFromString(templateXml, 'application/xml');
+    if (applyOp.title) {
+      const frame = doc.getElementsByTagName('frame')[0];
+      if (frame) frame.setAttribute('title', applyOp.title);
+    }
+    if (applyOp.slots.length > 0) fillSlots(doc, applyOp.slots);
+    const patches = ops.filter((o) => o.type === 'patch');
+    if (patches.length > 0) applyPatches(doc, patches);
+  } else if (input.xml) {
+    doc = new DOMParser().parseFromString(input.xml, 'application/xml');
+    const parseError = doc.getElementsByTagName('parsererror')[0];
+    if (parseError) return { ok: false, error: `Invalid XML: ${parseError.textContent.slice(0, 200)}` };
+  } else {
+    return { ok: false, error: 'Provide either "dsl" or "xml".' };
+  }
+
+  // Extract operation elements (update, delete, layout) from XML
+  const { ops: xmlOps, hasSpatial, spatialRoots } = extractXmlOps(doc);
+
+  const originX = input.x ?? 0;
+  const originY = input.y ?? 0;
+  const keyMap = {};
+  let created = [];
+
+  if (hasSpatial) {
+    if (spatialRoots) {
+      // Batch mode: each spatial root is independent
+      const serializer = new XMLSerializer();
+      for (const root of spatialRoots) {
+        const elX = root.hasAttribute('x') ? Number(root.getAttribute('x')) : originX;
+        const elY = root.hasAttribute('y') ? Number(root.getAttribute('y')) : originY;
+        const xmlStr = serializer.serializeToString(root);
+        const tmpDoc = new DOMParser().parseFromString(xmlStr, 'application/xml');
+        const specs = layoutTemplate(tmpDoc, elX, elY);
+        const batchCreated = await createFromSpecs(specs, operations, keyMap);
+        created.push(...batchCreated);
+      }
+    } else {
+      // Single root spatial element (or DSL template)
+      const specs = layoutTemplate(doc, originX, originY);
+      created = await createFromSpecs(specs, operations, keyMap);
+    }
+  }
+
+  // Execute operations (update, delete, layout) after creation
+  const opResults = await executeXmlOps(xmlOps, operations);
+
+  const allResults = [...created, ...opResults];
+  const failed = opResults.filter((r) => !r.ok);
+  if (failed.length > 0 && created.length === 0) {
+    return { ok: false, error: `${failed.length} operation(s) failed.`, results: allResults };
+  }
+
+  return { ok: true, created: created.length, objects: allResults };
+};
+
+const handleSearchTemplates = async (input, traceContext, onStream) => {
+  try {
+    const result = await searchTemplates(input.query, traceContext, onStream);
+    return { ok: true, result };
+  } catch (err) {
+    console.error('[AI Tool] searchTemplates failed:', err);
+    return { ok: false, error: err.message };
+  }
+};
+
 export const executeTool = async (toolName, input, operations, traceContext, onStream) => {
   console.log(`[AI Tool] ${toolName}`, input);
   let result;
   try {
     switch (toolName) {
+      case 'applyTemplate': result = await handleApplyTemplate(input, operations); break;
+      case 'searchTemplates': result = await handleSearchTemplates(input, traceContext, onStream); break;
       case 'createObject': result = await handleCreate(input, operations); break;
       case 'updateObject': result = await handleUpdate(input, operations); break;
       case 'deleteObject': result = await handleDelete(input, operations); break;

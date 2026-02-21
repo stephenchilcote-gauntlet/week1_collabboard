@@ -1,76 +1,35 @@
-// Anthropic tool-use definitions — consolidated to 5 tools for minimal token usage.
+// Anthropic tool-use definitions — consolidated tools for minimal token usage.
 
 export const TOOLS = [
   {
-    name: 'createObject',
-    description: 'Create a board object. Types: sticky, rectangle, circle, text, frame, connector, embed.',
+    name: 'applyTemplate',
+    description: 'Create, update, delete, and layout board objects. Use dsl for named templates, xml for everything else.\n' +
+      'Create: <sticky color="#FFD700">text</sticky>, <frame title="T"><row gap="30">...</row></frame>\n' +
+      'Update: <update ref="label" text="new" color="#FF0000" x="500" y="300"/>\n' +
+      'Delete: <delete ref="label"/>\n' +
+      'Layout: <layout mode="grid" cols="3"><ref>label1</ref><ref>label2</ref></layout> (modes: grid, distributeH, distributeV, align)\n' +
+      'Batch: <batch><sticky>New</sticky><update ref="label" color="#FF0000"/><delete ref="old"/></batch>\n' +
+      'DSL: templateName "Title" ; slot1 ; slot2. Patches: @path value. Pipes: slot1|sub1|sub2.\n' +
+      'Connector: <connector from="key" to="key" style="arrow"/>. Use key= on elements for refs.',
     input_schema: {
       type: 'object',
       properties: {
-        type: { type: 'string', enum: ['sticky', 'rectangle', 'circle', 'text', 'frame', 'connector', 'embed'] },
-        x: { type: 'number', description: 'Center x coordinate' },
-        y: { type: 'number', description: 'Center y coordinate' },
-        width: { type: 'number' },
-        height: { type: 'number' },
-        text: { type: 'string' },
-        title: { type: 'string' },
-        color: { type: 'string' },
-        fontSize: { type: 'number' },
-        html: { type: 'string' },
-        fromId: { type: 'string', description: 'Label or UUID of source object (for connectors)' },
-        toId: { type: 'string', description: 'Label or UUID of target object (for connectors)' },
-        style: { type: 'string', enum: ['line', 'arrow'] },
-        zIndex: { type: 'number', description: 'Stack order. Higher = in front. Auto-assigned if omitted.' },
-      },
-      required: ['type'],
-    },
-  },
-  {
-    name: 'updateObject',
-    description: 'Update one or many objects. Pass objectId + properties for a single update, or pass a "updates" array for batch updates.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        objectId: { type: 'string', description: 'Label or UUID of the object to update (single mode)' },
-        x: { type: 'number', description: 'Center x coordinate' },
-        y: { type: 'number', description: 'Center y coordinate' },
-        width: { type: 'number' },
-        height: { type: 'number' },
-        text: { type: 'string' },
-        color: { type: 'string' },
-        title: { type: 'string' },
-        zIndex: { type: 'number', description: 'Stack order. Higher = in front.' },
-        updates: {
-          type: 'array',
-          description: 'Batch mode: array of updates, each with objectId and properties to change.',
-          items: {
-            type: 'object',
-            properties: {
-              objectId: { type: 'string', description: 'Label or UUID of the object to update' },
-              x: { type: 'number' },
-              y: { type: 'number' },
-              width: { type: 'number' },
-              height: { type: 'number' },
-              text: { type: 'string' },
-              color: { type: 'string' },
-              title: { type: 'string' },
-              zIndex: { type: 'number' },
-            },
-            required: ['objectId'],
-          },
-        },
+        dsl: { type: 'string', description: 'DSL program: template name + slots/patches. Example: swot "Q1 Review" ; Strengths ; Weaknesses ; Opportunities ; Threats' },
+        xml: { type: 'string', description: 'XML for create/update/delete/layout. Elements: sticky, text, rect, circle, frame, embed, connector, update, delete, layout, batch.' },
+        x: { type: 'number', description: 'Center x for placement (default: cursor or 0)' },
+        y: { type: 'number', description: 'Center y for placement (default: cursor or 0)' },
       },
     },
   },
   {
-    name: 'deleteObject',
-    description: 'Delete an object by label or ID.',
+    name: 'searchTemplates',
+    description: 'Search the template catalog. Returns matching template IDs with slot info. Call before applyTemplate if unsure which template to use.',
     input_schema: {
       type: 'object',
       properties: {
-        objectId: { type: 'string', description: 'Label or UUID' },
+        query: { type: 'string', description: 'Natural language search query, e.g. "kanban board" or "strategic analysis grid"' },
       },
-      required: ['objectId'],
+      required: ['query'],
     },
   },
   {
@@ -99,35 +58,7 @@ export const TOOLS = [
       required: ['query'],
     },
   },
-  {
-    name: 'fitFrameToObjects',
-    description: 'Resize and reposition a frame to fit the bounding box of the given objects, plus 15% padding.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        frameId: { type: 'string', description: 'Label or UUID of the frame to resize.' },
-        objectIds: { type: 'array', items: { type: 'string' }, description: 'Labels or UUIDs of objects the frame should enclose.' },
-      },
-      required: ['frameId', 'objectIds'],
-    },
-  },
-  {
-    name: 'layoutObjects',
-    description: 'Arrange objects using layout algorithms. Modes: "grid" (arrange in rows/columns), "distributeH"/"distributeV" (equal spacing), "align" (align edges/centers).',
-    input_schema: {
-      type: 'object',
-      properties: {
-        mode: { type: 'string', enum: ['grid', 'distributeH', 'distributeV', 'align'], description: 'Layout algorithm to apply.' },
-        objectIds: { type: 'array', items: { type: 'string' }, description: 'Labels or UUIDs of objects to arrange.' },
-        columns: { type: 'number', description: 'Grid mode: number of columns (default: sqrt of count).' },
-        spacing: { type: 'number', description: 'Grid mode: gap between objects in pixels (default: 30).' },
-        startX: { type: 'number', description: 'Grid mode: top-left x of the grid (default: first object x).' },
-        startY: { type: 'number', description: 'Grid mode: top-left y of the grid (default: first object y).' },
-        alignment: { type: 'string', enum: ['left', 'center', 'right', 'top', 'middle', 'bottom'], description: 'Align mode: edge or center to align to.' },
-      },
-      required: ['mode', 'objectIds'],
-    },
-  },
+
 ];
 
 export const TOOL_NAMES = TOOLS.map((t) => t.name);
